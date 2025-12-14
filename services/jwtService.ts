@@ -1,8 +1,15 @@
-import type { DecodedJwt, JwtHeader, JwtPayload, VerificationResult } from '../types';
+import type { DecodedJwt, JwtHeader, JwtPayload, VerificationResult, KeyPair } from '../types';
 
 function base64UrlEncode(data: string | Uint8Array): string {
-  const str = typeof data === 'string' ? data : String.fromCharCode.apply(null, Array.from(new Uint8Array(data)));
-  return btoa(str)
+  let inputBytes: Uint8Array;
+  if (typeof data === 'string') {
+      inputBytes = new TextEncoder().encode(data);
+  } else {
+      inputBytes = data;
+  }
+  
+  const binaryStr = Array.from(inputBytes, (byte) => String.fromCharCode(byte)).join('');
+  return btoa(binaryStr)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
@@ -13,7 +20,27 @@ function base64UrlDecode(str: string): string {
     while (str.length % 4) {
         str += '=';
     }
-    return atob(str);
+    
+    const binaryStr = atob(str);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+    }
+    
+    return new TextDecoder().decode(bytes);
+}
+
+// Helper to fix potential reference error in base64UrlDecode if needed, 
+// though logic above used binaryStr, let's clean up the decode function slightly.
+function base64UrlDecodeClean(str: string): string {
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (str.length % 4) { str += '='; }
+    const binaryStr = atob(str);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return new TextDecoder().decode(bytes);
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
@@ -54,11 +81,11 @@ function importPem(pem: string, type: 'public' | 'private') {
 
 
 export const jwtService = {
-  async generateRsaKeyPair(): Promise<{ publicKey: string, privateKey: string }> {
+  async generateRsaKeyPair(modulusLength: number = 2048): Promise<KeyPair> {
     const keyPair = await crypto.subtle.generateKey(
       {
-        name: 'RSA-SSA-PKCS1-v1_5',
-        modulusLength: 2048,
+        name: 'RSASSA-PKCS1-v1_5', // Fixed algorithm name
+        modulusLength: modulusLength,
         publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
         hash: 'SHA-256',
       },
@@ -68,11 +95,46 @@ export const jwtService = {
 
     const publicKeyData = await crypto.subtle.exportKey('spki', keyPair.publicKey);
     const privateKeyData = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+    const jwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+
+    const kid = crypto.randomUUID().substring(0, 8);
+    (jwk as any).kid = kid;
+    jwk.use = 'sig';
+    jwk.alg = 'RS256';
 
     return {
       publicKey: exportPem(publicKeyData, 'public'),
       privateKey: exportPem(privateKeyData, 'private'),
+      jwks: { keys: [jwk] },
+      keyId: kid
     };
+  },
+
+  async generateEcKeyPair(namedCurve: string = 'P-256'): Promise<KeyPair> {
+      const keyPair = await crypto.subtle.generateKey(
+          {
+              name: 'ECDSA',
+              namedCurve: namedCurve,
+          },
+          true,
+          ['sign', 'verify']
+      );
+
+      const publicKeyData = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+      const privateKeyData = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+      const jwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+
+      const kid = crypto.randomUUID().substring(0, 8);
+      (jwk as any).kid = kid;
+      jwk.use = 'sig';
+      jwk.alg = 'ES256';
+
+      return {
+          publicKey: exportPem(publicKeyData, 'public'),
+          privateKey: exportPem(privateKeyData, 'private'),
+          jwks: { keys: [jwk] },
+          keyId: kid
+      };
   },
 
   async sign(header: JwtHeader, payload: JwtPayload, key: string): Promise<string> {
@@ -87,25 +149,40 @@ export const jwtService = {
         signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(dataToSign));
     } else if (header.alg === 'RS256') {
         const privateKeyBuffer = importPem(key, 'private');
-        const cryptoKey = await crypto.subtle.importKey('pkcs8', privateKeyBuffer, { name: 'RSA-SSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-        signature = await crypto.subtle.sign('RSA-SSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(dataToSign));
+        const cryptoKey = await crypto.subtle.importKey('pkcs8', privateKeyBuffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+        signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(dataToSign));
+    } else if (header.alg === 'ES256') {
+        const privateKeyBuffer = importPem(key, 'private');
+        const cryptoKey = await crypto.subtle.importKey('pkcs8', privateKeyBuffer, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+        signature = await crypto.subtle.sign({ name: 'ECDSA', hash: { name: 'SHA-256' } }, cryptoKey, new TextEncoder().encode(dataToSign));
     } else {
         throw new Error(`Unsupported algorithm: ${header.alg}`);
     }
 
-    const encodedSignature = base64UrlEncode(new Uint8Array(signature));
+    const signatureBytes = new Uint8Array(signature);
+    // Manual base64url encoding for signature bytes to avoid btoa issues with binary
+    let binary = '';
+    const len = signatureBytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(signatureBytes[i]);
+    }
+    const encodedSignature = btoa(binary)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
     return `${dataToSign}.${encodedSignature}`;
   },
 
   decode(token: string): DecodedJwt | null {
     try {
-      const [encodedHeader, encodedPayload, signature] = token.split('.');
-      if (!encodedHeader || !encodedPayload || !signature) {
-        return null;
-      }
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      
+      const [encodedHeader, encodedPayload, signature] = parts;
 
-      const header: JwtHeader = JSON.parse(base64UrlDecode(encodedHeader));
-      const payload: JwtPayload = JSON.parse(base64UrlDecode(encodedPayload));
+      const header: JwtHeader = JSON.parse(base64UrlDecodeClean(encodedHeader));
+      const payload: JwtPayload = JSON.parse(base64UrlDecodeClean(encodedPayload));
 
       return {
         header,
@@ -126,8 +203,17 @@ export const jwtService = {
     }
     
     const { header, payload, raw } = decoded;
+    
+    if (header.alg === 'none') {
+        return { isValid: false, reason: 'Algorithm "none" is not accepted for security reasons.' };
+    }
+
     const dataToSign = `${raw.header}.${raw.payload}`;
-    const signatureBytes = new Uint8Array(base64UrlDecode(decoded.signature).split('').map(c => c.charCodeAt(0)));
+    
+    const sigStr = decoded.signature.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = sigStr.length % 4;
+    const paddedSig = pad ? sigStr + '='.repeat(4 - pad) : sigStr;
+    const signatureBytes = new Uint8Array(atob(paddedSig).split('').map(c => c.charCodeAt(0)));
 
     try {
       let isValidSignature = false;
@@ -136,8 +222,12 @@ export const jwtService = {
           isValidSignature = await crypto.subtle.verify('HMAC', cryptoKey, signatureBytes, new TextEncoder().encode(dataToSign));
       } else if (header.alg === 'RS256') {
           const publicKeyBuffer = importPem(key, 'public');
-          const cryptoKey = await crypto.subtle.importKey('spki', publicKeyBuffer, { name: 'RSA-SSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-          isValidSignature = await crypto.subtle.verify('RSA-SSA-PKCS1-v1_5', cryptoKey, signatureBytes, new TextEncoder().encode(dataToSign));
+          const cryptoKey = await crypto.subtle.importKey('spki', publicKeyBuffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+          isValidSignature = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', cryptoKey, signatureBytes, new TextEncoder().encode(dataToSign));
+      } else if (header.alg === 'ES256') {
+          const publicKeyBuffer = importPem(key, 'public');
+          const cryptoKey = await crypto.subtle.importKey('spki', publicKeyBuffer, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+          isValidSignature = await crypto.subtle.verify({ name: 'ECDSA', hash: { name: 'SHA-256' } }, cryptoKey, signatureBytes, new TextEncoder().encode(dataToSign));
       } else {
         return { isValid: false, reason: `Unsupported algorithm "${header.alg}" for verification.` };
       }
@@ -147,12 +237,13 @@ export const jwtService = {
       }
 
       const now = Math.floor(Date.now() / 1000);
-      
-      if (payload.exp && now > payload.exp) {
+      const tolerance = 2;
+
+      if (payload.exp && now > (payload.exp + tolerance)) {
         return { isValid: false, reason: `Token expired at ${new Date(payload.exp * 1000).toLocaleString()}.` };
       }
 
-      if (payload.nbf && now < payload.nbf) {
+      if (payload.nbf && now < (payload.nbf - tolerance)) {
         return { isValid: false, reason: `Token is not valid before ${new Date(payload.nbf * 1000).toLocaleString()}.` };
       }
       
@@ -169,5 +260,18 @@ export const jwtService = {
       console.error('Verification error:', error);
       return { isValid: false, reason: `Verification failed: ${error.message}` };
     }
+  },
+
+  async sha256(plain: string): Promise<ArrayBuffer> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(plain);
+    return crypto.subtle.digest('SHA-256', data);
+  },
+
+  base64UrlEncode(buffer: ArrayBuffer): string {
+    return arrayBufferToBase64(buffer)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
   }
 };

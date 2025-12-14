@@ -31,7 +31,7 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ data }) => {
     return String(value);
   };
 
-  const renderHumanReadableTime = (key: string, value: number) => {
+  const renderHumanReadableTime = (key: string, value: unknown) => {
     if (['exp', 'nbf', 'iat'].includes(key) && typeof value === 'number') {
         return `(${new Date(value * 1000).toLocaleString()})`
     }

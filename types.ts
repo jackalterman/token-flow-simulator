@@ -1,3 +1,4 @@
+
 export interface JwtHeader {
   alg: 'HS256' | 'RS256' | string;
   typ: string;
@@ -35,4 +36,11 @@ export interface DecoderData {
     key: string;
     audience?: string;
     issuer?: string;
+}
+
+export interface KeyPair {
+    publicKey: string;
+    privateKey: string;
+    jwks: any;
+    keyId: string;
 }
