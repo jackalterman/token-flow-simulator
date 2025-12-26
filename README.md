@@ -52,7 +52,7 @@ A high-fidelity, interactive sandbox for mastering modern authentication and aut
     ```bash
     npm run dev
     ```
-4.  **Open your browser:** Navigate to `http://localhost:5173`.
+4.  **Open your browser:** Navigate to `http://localhost:3000`.
 
 ---
 
