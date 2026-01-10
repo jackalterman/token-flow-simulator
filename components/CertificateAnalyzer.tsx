@@ -15,10 +15,10 @@ import {
 import type { DecoderData } from '../types';
 
 interface CertificateAnalyzerProps {
-  onSendToDecoder?: (data: DecoderData) => void;
+  // onSendToDecoder removed as JWT decoder is not for public keys
 }
 
-const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = ({ onSendToDecoder }) => {
+const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = () => {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [chain, setChain] = useState<CertificateInfo[]>([]);
@@ -57,15 +57,6 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = ({ onSendToDecod
     if (chain.length === 0) return;
     const cert = chain[selectedCertIndex];
     certificateService.exportCertificate(cert.pem, `certificate-${selectedCertIndex}.pem`);
-  };
-
-  const handleSendToDecoder = () => {
-    if (chain.length === 0 || !onSendToDecoder) return;
-    const cert = chain[selectedCertIndex];
-    onSendToDecoder({
-      token: cert.pem,
-      title: `Certificate: ${cert.subject.substring(0, 30)}...`
-    });
   };
 
   const selectedCert = chain[selectedCertIndex];
@@ -124,33 +115,38 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = ({ onSendToDecod
       </div>
 
       {chain.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Chain Visualization */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 tracking-wider">Analysis Results</h4>
-              <div className="space-y-4 relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Analysis Results List */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col h-[500px]">
+              <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 tracking-wider flex-none">Analysis Results</h4>
+              <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar flex-1">
                 {chain.map((cert, index) => (
-                  <div key={index} className="relative flex items-start group">
-                    <button
-                      onClick={() => setSelectedCertIndex(index)}
-                      className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all ${
-                        selectedCertIndex === index 
-                          ? 'bg-sky-600 border-sky-600 text-white shadow-md' 
-                          : 'bg-white border-slate-200 text-slate-400 hover:border-sky-400 hover:text-sky-500'
-                      }`}
-                    >
+                  <button
+                    key={index}
+                    onClick={() => setSelectedCertIndex(index)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all flex items-start gap-4 group ${
+                      selectedCertIndex === index 
+                        ? 'bg-sky-50 border-sky-200 ring-1 ring-sky-100' 
+                        : 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className={`flex-none h-8 w-8 flex items-center justify-center rounded-full border-2 transition-all ${
+                      selectedCertIndex === index 
+                        ? 'bg-sky-600 border-sky-600 text-white shadow-sm' 
+                        : 'bg-white border-slate-200 text-slate-400 group-hover:border-sky-400 group-hover:text-sky-500'
+                    }`}>
                       {index + 1}
-                    </button>
-                    <div className="ml-4 flex-1">
-                      <p className={`text-xs font-bold ${selectedCertIndex === index ? 'text-sky-700' : 'text-slate-600'}`}>
-                        {index === 0 ? 'Latest Certificate' : `Certificate Entry #${index + 1}`}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-bold truncate ${selectedCertIndex === index ? 'text-sky-700' : 'text-slate-600'}`}>
+                        {index === 0 ? 'Latest Certificate' : `Entry #${index + 1}`}
                       </p>
-                      <p className="text-[10px] text-slate-400 truncate max-w-[200px]">
-                        Subject: {cert.subject.split(',')[0]}
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                        {cert.subject.split(',')[0]}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -167,7 +163,7 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = ({ onSendToDecod
           </div>
 
           {/* Details Area */}
-          <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-sky-100 rounded-lg text-sky-600">
@@ -175,7 +171,7 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = ({ onSendToDecod
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">Certificate Details</h4>
-                  <p className="text-[10px] text-slate-500">Position {selectedCertIndex + 1} in chain</p>
+                  <p className="text-[10px] text-slate-500">Position {selectedCertIndex + 1} in analysis</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -185,13 +181,6 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = ({ onSendToDecod
                   title="Export PEM"
                 >
                   <DownloadIcon className="h-4 w-4" />
-                </button>
-                <button 
-                  onClick={handleSendToDecoder}
-                  className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
-                  title="Send to Decoder"
-                >
-                  <ExternalLinkIcon className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -234,20 +223,13 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = ({ onSendToDecod
             
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                <button 
-                 onClick={handleSendToDecoder}
-                 className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-xs font-bold text-slate-700 rounded-lg hover:border-sky-300 hover:text-sky-700 transition-all"
-               >
-                 <ArrowRightIcon className="h-3 w-3" />
-                 Send to Decoder
-               </button>
-               <button 
                  onClick={() => {
                    // Mock save to list
                    alert('Saved to local storage (Simulated)');
                  }}
-                 className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-xs font-bold rounded-lg hover:bg-sky-700 transition-colors shadow-sm"
+                 className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 text-white text-sm font-bold rounded-lg hover:bg-sky-700 transition-colors shadow-sm"
                >
-                 <SaveIcon className="h-3 w-3" />
+                 <SaveIcon className="h-4 w-4" />
                  Save to Collection
                </button>
             </div>
