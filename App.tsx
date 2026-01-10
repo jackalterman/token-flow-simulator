@@ -48,7 +48,7 @@ const App: React.FC = () => {
       case AppView.SAML:
         return <SamlTools />;
       case AppView.KEYS:
-        return <KeyManager />;
+        return <KeyManager onSendToDecoder={handleSendToDecoder} />;
       case AppView.SIMULATE:
         return <FailureSimulator onSendToDecoder={handleSendToDecoder} />;
       case AppView.FLOWS:

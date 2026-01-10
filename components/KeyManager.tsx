@@ -1,11 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import CodeBlock from './CodeBlock';
 import { jwtService } from '../services/jwtService';
 import { KeyIcon, CertificateIcon, ClipboardIcon, CheckIcon, ShieldCheckIcon, AlertTriangleIcon, RefreshIcon } from './icons';
-import type { KeyPair } from '../types';
+import { KeyPair, DecoderData } from '../types';
+import CertificateAnalyzer from './CertificateAnalyzer';
 
-const KeyManager: React.FC = () => {
+interface KeyManagerProps {
+  onSendToDecoder?: (data: DecoderData) => void;
+}
+
+const KeyManager: React.FC<KeyManagerProps> = ({ onSendToDecoder }) => {
   const [keyPair, setKeyPair] = useState<KeyPair | null>(null);
   const [activeTab, setActiveTab] = useState<'pem' | 'jwks' | 'cert' | 'registration'>('pem');
   const [showPrivate, setShowPrivate] = useState(false);
@@ -280,22 +284,14 @@ ${body}
                     </div>
                 )}
 
-                {keyPair && activeTab === 'cert' && (
+                {activeTab === 'cert' && (
                      <div className="space-y-4 animate-fade-in">
                          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg">
                             <p className="text-sm text-yellow-800">
-                                <strong>Simulation Mode:</strong> This is a self-signed certificate wrapper. In production, your Certificate Authority (CA) would sign the generated CSR.
+                                <strong>Certificate Analysis:</strong> Paste a domain URL or a PEM chain to analyze certificate details. Use "Rotate Key Pair" in the sidebar to generate new local keys.
                             </p>
                         </div>
-                        <div className="bg-white p-6 rounded-xl border border-slate-200 text-center shadow-sm relative">
-                             <div className="absolute top-4 right-4">
-                                <CopyButton text={getSimulatedCert()} />
-                            </div>
-                            <CertificateIcon className="h-16 w-16 text-sky-100 mx-auto mb-4" />
-                            <div className="text-left bg-slate-900 rounded-lg overflow-hidden">
-                                <CodeBlock content={getSimulatedCert()} />
-                            </div>
-                        </div>
+                        <CertificateAnalyzer onSendToDecoder={onSendToDecoder} />
                     </div>
                 )}
 
