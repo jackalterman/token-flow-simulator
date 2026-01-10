@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import Tabs from './components/Tabs';
+import Sidebar, { AppView } from './components/Sidebar';
 import JwtEncoder from './components/JwtEncoder';
 import JwtDecoder from './components/JwtDecoder';
 import FailureSimulator from './components/FailureSimulator';
@@ -13,23 +13,11 @@ import TokenDiff from './components/TokenDiff';
 import FormatConverter from './components/FormatConverter';
 import SecretGenerator from './components/SecretGenerator';
 import ScopeExplorer from './components/ScopeExplorer';
-import { ShieldCheckIcon } from './components/icons';
+import Base64Tool from './components/Base64Tool';
+import UrlTool from './components/UrlTool';
+import HashTool from './components/HashTool';
+import HmacTool from './components/HmacTool';
 import type { DecoderData } from './types';
-
-enum AppView {
-  DECODE = 'Decode',
-  ENCODE = 'Encode',
-  SAML = 'SAML',
-  KEYS = 'Keys',
-  SIMULATE = 'Simulate',
-  FLOWS = 'Flows',
-  PKCE = 'PKCE',
-  DIFF = 'Diff',
-  CONVERT = 'Convert',
-  SECRETS = 'Secrets',
-  SCOPES = 'Scopes',
-  LEARN = 'Learn',
-}
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<AppView>(AppView.DECODE);
@@ -72,6 +60,14 @@ const App: React.FC = () => {
         return <ScopeExplorer />;
       case AppView.LEARN:
         return <LearnFlows />;
+      case AppView.BASE64:
+        return <Base64Tool />;
+      case AppView.URL:
+        return <UrlTool />;
+      case AppView.HASH:
+        return <HashTool />;
+      case AppView.HMAC:
+        return <HmacTool />;
       default:
         return (
           <JwtDecoder
@@ -83,40 +79,51 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen font-sans bg-gradient-to-b from-slate-50 to-slate-100">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 bg-opacity-90 backdrop-blur-md">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-          <div className="flex flex-col md:flex-row md:items-center justify-between py-4 gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="bg-sky-50 p-2 rounded-lg shadow-sm border border-sky-100">
-                <ShieldCheckIcon className="h-8 w-8 text-sky-600" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                  Token Flow Simulator
-                </h1>
-                <p className="text-xs text-slate-500 font-medium">Interactive Security Playground</p>
-              </div>
-            </div>
-            <div className="w-full md:w-auto overflow-x-auto">
-              <Tabs
-                views={Object.values(AppView)}
-                activeView={activeView}
-                setActiveView={(view) => setActiveView(view as AppView)}
-              />
+    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+      <Sidebar activeView={activeView} setActiveView={setActiveView} />
+      
+      <main className="flex-1 overflow-y-auto">
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10 px-8 py-4">
+          <div className="flex items-center justify-between max-w-5xl mx-auto">
+            <h2 className="text-xl font-bold text-slate-800">{activeView}</h2>
+            <div className="text-sm text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full">
+              Browser-only session
             </div>
           </div>
-        </div>
-      </header>
-      <main className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
-        <div className="animate-fade-in">
+        </header>
+
+        <div className="p-8 max-w-5xl mx-auto animate-fade-in">
           {renderView()}
+          
+          <footer className="mt-16 pt-8 border-t border-slate-200 text-center text-slate-400 text-sm pb-12">
+            <p>Built for educational purposes to understand token-based authentication mechanics.</p>
+            <p className="mt-1">All operations are performed locally in your browser.</p>
+          </footer>
         </div>
       </main>
-      <footer className="text-center py-12 text-slate-400 text-sm border-t border-slate-200 mt-12 bg-slate-50">
-        <p>Built for educational purposes to understand token-based authentication mechanics.</p>
-        <p className="mt-2 text-xs">Simulations run entirely in your browser. No data is sent to any server.</p>
-      </footer>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.4s ease-out forwards;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #cbd5e1;
+        }
+      `}} />
     </div>
   );
 };

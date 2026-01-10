@@ -1,0 +1,145 @@
+
+import React from 'react';
+import { 
+  ShieldCheckIcon, 
+  FileCodeIcon, 
+  LockClosedIcon, 
+  KeyIcon, 
+  ShuffleIcon, 
+  ServerIcon, 
+  SearchIcon, 
+  ScaleIcon, 
+  RefreshIcon, 
+  InfoIcon,
+  CertificateIcon,
+  UsersIcon,
+  ArrowRightIcon
+} from './icons';
+
+export enum AppView {
+  DECODE = 'Decode',
+  ENCODE = 'Encode',
+  SAML = 'SAML',
+  KEYS = 'Keys',
+  SIMULATE = 'Simulate',
+  FLOWS = 'Flows',
+  PKCE = 'PKCE',
+  DIFF = 'Diff',
+  CONVERT = 'Convert',
+  SECRETS = 'Secrets',
+  SCOPES = 'Scopes',
+  LEARN = 'Learn',
+  BASE64 = 'Base64',
+  URL = 'URL',
+  HASH = 'Hashing',
+  HMAC = 'HMAC'
+}
+
+interface SidebarProps {
+  activeView: AppView;
+  setActiveView: (view: AppView) => void;
+}
+
+interface Category {
+  name: string;
+  items: {
+    id: AppView;
+    label: string;
+    icon: React.FC<{ className?: string }>;
+  }[];
+}
+
+const categories: Category[] = [
+  {
+    name: 'JWT & OAuth',
+    items: [
+      { id: AppView.DECODE, label: 'JWT Decoder', icon: SearchIcon },
+      { id: AppView.ENCODE, label: 'JWT Encoder', icon: FileCodeIcon },
+      { id: AppView.DIFF, label: 'Token Diff', icon: ScaleIcon },
+      { id: AppView.SCOPES, label: 'Scope Explorer', icon: UsersIcon },
+      { id: AppView.PKCE, label: 'PKCE Generator', icon: RefreshIcon },
+    ],
+  },
+  {
+    name: 'Auth Protocols',
+    items: [
+      { id: AppView.SAML, label: 'SAML Tools', icon: CertificateIcon },
+      { id: AppView.FLOWS, label: 'Flow Visualizer', icon: ShuffleIcon },
+      { id: AppView.SIMULATE, label: 'Failure Simulator', icon: ShieldCheckIcon },
+      { id: AppView.LEARN, label: 'Learn Flows', icon: InfoIcon },
+    ],
+  },
+  {
+    name: 'Data Tools',
+    items: [
+      { id: AppView.BASE64, label: 'Base64 Tool', icon: LockClosedIcon },
+      { id: AppView.URL, label: 'URL Tool', icon: ArrowRightIcon },
+      { id: AppView.HASH, label: 'Hashing Tool', icon: KeyIcon },
+      { id: AppView.HMAC, label: 'HMAC Tool', icon: ShieldCheckIcon },
+      { id: AppView.CONVERT, label: 'Format Converter', icon: RefreshIcon },
+    ],
+  },
+  {
+    name: 'Infrastructure',
+    items: [
+      { id: AppView.KEYS, label: 'Key Manager', icon: KeyIcon },
+      { id: AppView.SECRETS, label: 'Secret Generator', icon: LockClosedIcon },
+    ],
+  },
+];
+
+const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
+  return (
+    <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
+      <div className="p-6 border-b border-slate-100">
+        <div className="flex items-center space-x-3">
+          <div className="bg-sky-50 p-2 rounded-lg shadow-sm border border-sky-100">
+            <ShieldCheckIcon className="h-6 w-6 text-sky-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 tracking-tight leading-none">
+              TokenFlow
+            </h2>
+            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-1">Toolbox</p>
+          </div>
+        </div>
+      </div>
+      
+      <nav className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar">
+        {categories.map((category) => (
+          <div key={category.name}>
+            <h3 className="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              {category.name}
+            </h3>
+            <div className="mt-2 space-y-1">
+              {category.items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveView(item.id)}
+                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    activeView === item.id
+                      ? 'bg-sky-50 text-sky-700'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <item.icon className={`mr-3 h-5 w-5 ${
+                    activeView === item.id ? 'text-sky-600' : 'text-slate-400'
+                  }`} />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+      
+      <div className="p-4 border-t border-slate-100 bg-slate-50">
+        <p className="text-[10px] text-slate-400 text-center font-medium">
+          v2.0.0 • Client-side only
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default Sidebar;
