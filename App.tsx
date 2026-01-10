@@ -21,6 +21,7 @@ import SubnetCalculator from './components/SubnetCalculator';
 import PasswordAnalyzer from './components/PasswordAnalyzer';
 import UuidGenerator from './components/UuidGenerator';
 import CronParser from './components/CronParser';
+import HarAnalyzer from './components/HarAnalyzer';
 import type { DecoderData } from './types';
 
 const App: React.FC = () => {
@@ -80,6 +81,8 @@ const App: React.FC = () => {
         return <UuidGenerator />;
       case AppView.CRON:
         return <CronParser />;
+      case AppView.HAR_ANALYZER:
+        return <HarAnalyzer onSendToDecoder={handleSendToDecoder} />;
       default:
         return (
           <JwtDecoder

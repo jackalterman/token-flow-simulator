@@ -13,7 +13,8 @@ import {
   InfoIcon,
   CertificateIcon,
   UsersIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  SearchIcon as DetailIcon
 } from './icons';
 
 export enum AppView {
@@ -36,7 +37,8 @@ export enum AppView {
   SUBNET = 'Subnet Calculator',
   PASSWORD = 'Password Analyzer',
   UUID = 'UUID Generator',
-  CRON = 'Cron Parser'
+  CRON = 'Cron Parser',
+  HAR_ANALYZER = 'HAR Analyzer'
 }
 
 interface SidebarProps {
@@ -83,6 +85,7 @@ const categories: Category[] = [
       { id: AppView.UUID, label: 'UUID Generator', icon: RefreshIcon },
       { id: AppView.PASSWORD, label: 'Password Analyzer', icon: ShieldCheckIcon },
       { id: AppView.CONVERT, label: 'Format Converter', icon: RefreshIcon },
+      { id: AppView.HAR_ANALYZER, label: 'HAR Analyzer', icon: DetailIcon },
     ],
   },
   {
