@@ -175,29 +175,29 @@ const JwtDecoder: React.FC<JwtDecoderProps> = ({ initialData, onDataHandled }) =
         </div>
         {decoded ? (
           <div className="space-y-4 animate-fade-in">
-            <div className="bg-slate-800 rounded-xl overflow-hidden">
-                <div className="px-4 py-2 bg-slate-900 border-b border-slate-700 flex justify-between items-center">
+            <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700">
+                <div className="px-4 py-2 bg-slate-900 border-b border-slate-700 flex justify-between items-center rounded-t-xl">
                     <span className="text-xs font-bold text-slate-400 uppercase">Header</span>
                     <span className="text-xs font-mono text-slate-500">ALGORITHM & TOKEN TYPE</span>
                 </div>
                 <JsonViewer data={decoded.header} />
             </div>
             
-            <div className="bg-slate-800 rounded-xl overflow-hidden">
-                 <div className="px-4 py-2 bg-slate-900 border-b border-slate-700 flex justify-between items-center">
+            <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700">
+                 <div className="px-4 py-2 bg-slate-900 border-b border-slate-700 flex justify-between items-center rounded-t-xl">
                     <span className="text-xs font-bold text-slate-400 uppercase">Payload</span>
                     <span className="text-xs font-mono text-slate-500">DATA</span>
                 </div>
-              <JsonViewer data={decoded.payload} />
+                <JsonViewer data={decoded.payload} />
             </div>
             
-             <div className="bg-slate-800 rounded-xl overflow-hidden">
-                <div className="px-4 py-2 bg-slate-900 border-b border-slate-700 flex justify-between items-center">
+             <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700">
+                <div className="px-4 py-2 bg-slate-900 border-b border-slate-700 flex justify-between items-center rounded-t-xl">
                     <span className="text-xs font-bold text-slate-400 uppercase">Signature</span>
                     <span className="text-xs font-mono text-slate-500">VERIFICATION</span>
                 </div>
-                <div className="p-4 overflow-x-auto">
-                     <code className="text-sm text-emerald-400 font-mono break-all">{decoded.signature}</code>
+                <div className="p-4">
+                     <code className="text-sm text-emerald-400 font-mono break-all whitespace-pre-wrap">{decoded.signature}</code>
                 </div>
             </div>
           </div>

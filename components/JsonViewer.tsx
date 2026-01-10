@@ -39,15 +39,19 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ data }) => {
   }
 
   return (
-    <div className="bg-slate-800 rounded-lg p-4 text-sm text-slate-100 font-mono overflow-x-auto">
-      <pre>
+    <div className="bg-slate-800 rounded-lg p-4 text-sm text-slate-100 font-mono whitespace-pre-wrap break-all">
+      <pre className="whitespace-pre-wrap break-all">
         <code>
           {`{\n`}
           {Object.entries(data).map(([key, value], index, arr) => (
             <div key={key} className="relative group pl-4">
-                <span className="text-sky-400 cursor-pointer" title={JWT_CLAIM_DESCRIPTIONS[key]}>
+                <span className="text-sky-400 cursor-pointer relative" title={JWT_CLAIM_DESCRIPTIONS[key]}>
                     "{key}"
-                    {JWT_CLAIM_DESCRIPTIONS[key] && <span className="absolute left-full ml-3 hidden group-hover:block w-64 bg-slate-900 text-white text-xs rounded py-1 px-2 z-10 border border-slate-700 shadow-lg">{JWT_CLAIM_DESCRIPTIONS[key]}</span>}
+                    {JWT_CLAIM_DESCRIPTIONS[key] && (
+                        <span className="absolute top-full left-0 mt-2 hidden group-hover:block w-72 bg-slate-900/95 backdrop-blur-md text-white text-xs font-sans rounded-xl py-3 px-4 z-50 border border-slate-700 shadow-2xl pointer-events-none whitespace-normal normal-case tracking-normal animate-fade-in ring-1 ring-white/10">
+                            {JWT_CLAIM_DESCRIPTIONS[key]}
+                        </span>
+                    )}
                 </span>
                 <span className="text-slate-100">: </span>
                 <span className="text-amber-300">{formatValue(value)}</span>
