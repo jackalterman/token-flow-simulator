@@ -32,7 +32,11 @@ export enum AppView {
   BASE64 = 'Base64',
   URL = 'URL',
   HASH = 'Hashing',
-  HMAC = 'HMAC'
+  HMAC = 'HMAC',
+  SUBNET = 'Subnet Calculator',
+  PASSWORD = 'Password Analyzer',
+  UUID = 'UUID Generator',
+  CRON = 'Cron Parser'
 }
 
 interface SidebarProps {
@@ -76,12 +80,16 @@ const categories: Category[] = [
       { id: AppView.URL, label: 'URL Tool', icon: ArrowRightIcon },
       { id: AppView.HASH, label: 'Hashing Tool', icon: KeyIcon },
       { id: AppView.HMAC, label: 'HMAC Tool', icon: ShieldCheckIcon },
+      { id: AppView.UUID, label: 'UUID Generator', icon: RefreshIcon },
+      { id: AppView.PASSWORD, label: 'Password Analyzer', icon: ShieldCheckIcon },
       { id: AppView.CONVERT, label: 'Format Converter', icon: RefreshIcon },
     ],
   },
   {
     name: 'Infrastructure',
     items: [
+      { id: AppView.SUBNET, label: 'Subnet Calc', icon: ServerIcon },
+      { id: AppView.CRON, label: 'Cron Parser', icon: RefreshIcon },
       { id: AppView.KEYS, label: 'Key Manager', icon: KeyIcon },
       { id: AppView.SECRETS, label: 'Secret Generator', icon: LockClosedIcon },
     ],

@@ -17,6 +17,10 @@ import Base64Tool from './components/Base64Tool';
 import UrlTool from './components/UrlTool';
 import HashTool from './components/HashTool';
 import HmacTool from './components/HmacTool';
+import SubnetCalculator from './components/SubnetCalculator';
+import PasswordAnalyzer from './components/PasswordAnalyzer';
+import UuidGenerator from './components/UuidGenerator';
+import CronParser from './components/CronParser';
 import type { DecoderData } from './types';
 
 const App: React.FC = () => {
@@ -68,6 +72,14 @@ const App: React.FC = () => {
         return <HashTool />;
       case AppView.HMAC:
         return <HmacTool />;
+      case AppView.SUBNET:
+        return <SubnetCalculator />;
+      case AppView.PASSWORD:
+        return <PasswordAnalyzer />;
+      case AppView.UUID:
+        return <UuidGenerator />;
+      case AppView.CRON:
+        return <CronParser />;
       default:
         return (
           <JwtDecoder
