@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
+import { providerConfigs, ProviderConfig } from '../services/providerConfig';
 import { jwtService } from '../services/jwtService';
 import { xmlService } from '../services/xmlService';
 import { DecoderData } from '../types';
-import { UsersIcon, ServerIcon, SendIcon, SettingsIcon, FileCodeIcon, KeyIcon } from './icons';
+import { UsersIcon, ServerIcon, SendIcon, SettingsIcon, KeyIcon } from './icons';
 
 interface FlowVisualizerProps {
   onSendToDecoder: (data: DecoderData) => void;
@@ -25,7 +26,6 @@ const Node: React.FC<{ x: number; y: number; title: string; icon: React.ReactNod
 const Connection: React.FC<{ from: {x: number, y: number}, to: {x: number, y: number}, active: boolean }> = ({ from, to, active }) => {
      const angle = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
      const length = Math.sqrt(Math.pow(to.x - from.x, 2) + Math.pow(to.y - from.y, 2));
-     const drawLength = length - 70; 
 
      return (
         <g transform={`translate(${from.x}, ${from.y}) rotate(${angle})`}>
@@ -54,38 +54,38 @@ const Packet: React.FC<{ from: {x: number, y: number}, to: {x: number, y: number
     )
 }
 
-const oauthSteps = [
+const getOauthSteps = (provider: ProviderConfig) => [
   { 
     title: "1. User Initiates Login",
-    description: "The user clicks 'Login' in the app. The browser is redirected to the Auth Server.",
+    description: `The user clicks 'Login'. The app redirects the browser to ${provider.name}'s authorization endpoint.`,
     from: 'user', to: 'client',
     nodes: { active: ['user', 'client'], packet: { from: 'user', to: 'client', label: 'Click' } },
     details: {
         type: 'Browser Redirect',
-        content: `GET https://auth-server.com/authorize?
+        content: `GET ${provider.authorizeEndpoint}?
   response_type=code
   &client_id=CLIENT_123
   &redirect_uri=https://app.com/cb
-  &scope=openid profile`
+  &scope=${provider.scopes.slice(0, 2).join(' ')}`
     }
   },
   {
     title: "2. Redirect to Auth Server",
-    description: "The Client App redirects the User Agent (Browser) to the Authorization Server's login page.",
+    description: `The Client App redirects the browser to ${provider.name}.`,
     from: 'client', to: 'auth',
     nodes: { active: ['client', 'auth'], packet: { from: 'client', to: 'auth', label: 'Redirect' } },
     details: null
   },
   {
     title: "3. Authentication & Consent",
-    description: "The user enters credentials at the Auth Server and grants permission.",
+    description: `The user authenticates with ${provider.name} and grants permissions.`,
     from: 'user', to: 'auth',
     nodes: { active: ['user', 'auth'], packet: { from: 'user', to: 'auth', label: 'Creds' } },
     details: null
   },
   {
     title: "4. Authorization Code Issue",
-    description: "Auth Server redirects browser back to Client with a short-lived 'Authorization Code'.",
+    description: `${provider.name} redirects back with a short-lived 'Authorization Code'.`,
     from: 'auth', to: 'client',
     nodes: { active: ['auth', 'client'], packet: { from: 'auth', to: 'client', label: 'code=xyz' } },
     details: {
@@ -95,12 +95,12 @@ const oauthSteps = [
   },
   {
     title: "5. Token Exchange (Backchannel)",
-    description: "Client exchanges the code + client_secret for tokens directly with Auth Server. User never sees this.",
+    description: "Client exchanges the code for tokens directly with the provider.",
     from: 'client', to: 'auth',
     nodes: { active: ['client', 'auth'], packet: { from: 'client', to: 'auth', label: 'POST /token' } },
     details: {
         type: 'POST Request',
-        content: `POST /token
+        content: `POST ${provider.tokenEndpoint}
 grant_type=authorization_code
 &code=AUTH_CODE_XYZ
 &client_secret=SECRET_KEY`
@@ -108,7 +108,7 @@ grant_type=authorization_code
   },
   {
     title: "6. Tokens Returned",
-    description: "Auth Server validates code and secret, then returns Access Token (and ID/Refresh tokens).",
+    description: `${provider.name} returns an Access Token and ID Token.`,
     from: 'auth', to: 'client',
     nodes: { active: ['auth', 'client'], packet: { from: 'auth', to: 'client', label: '{ tokens }' } },
     details: {
@@ -122,94 +122,94 @@ grant_type=authorization_code
   },
   {
     title: "7. Access Resource",
-    description: "Client uses Access Token to fetch data from the Resource Server (API).",
+    description: "Client uses the Access Token to fetch data from the Resource Server (API) or UserInfo endpoint.",
     from: 'client', to: 'api',
     nodes: { active: ['client', 'api'], packet: { from: 'client', to: 'api', label: 'Bearer Token' } },
     details: {
         type: 'API Request',
-        content: `GET /api/user
+        content: `GET ${provider.userInfoEndpoint}
 Authorization: Bearer eyJhbG...`
     }
   },
 ];
 
-const samlSteps = [
+const getSamlSteps = (provider: ProviderConfig) => [
     {
         title: "1. Access Attempt",
         description: "User attempts to access a secured resource on the Service Provider (SP).",
-        from: 'user', to: 'client', // Client is SP here
+        from: 'user', to: 'client',
         nodes: { active: ['user', 'client'], packet: { from: 'user', to: 'client', label: 'Request' } },
         details: { type: 'HTTP Request', content: 'GET /secured-resource' }
     },
     {
         title: "2. Redirect to IdP",
-        description: "SP detects no session, generates SAMLRequest, and redirects browser to Identity Provider (IdP).",
-        from: 'client', to: 'auth', // Auth is IdP
+        description: `SP redirects browser to ${provider.name} (the IdP) with a SAMLRequest.`,
+        from: 'client', to: 'auth',
         nodes: { active: ['client', 'auth'], packet: { from: 'client', to: 'auth', label: 'SAMLRequest' } },
-        details: { type: 'HTTP 302 Redirect', content: 'Location: https://idp.com/sso?SAMLRequest=...' }
+        details: { type: 'HTTP 302 Redirect', content: `Location: ${provider.authorizeEndpoint}?SAMLRequest=...` }
     },
     {
         title: "3. Authentication",
-        description: "User authenticates with the IdP (if not already logged in).",
+        description: `User authenticates with ${provider.name}.`,
         from: 'user', to: 'auth',
         nodes: { active: ['user', 'auth'], packet: { from: 'user', to: 'auth', label: 'Login' } },
         details: null
     },
     {
         title: "4. SAML Response Generation",
-        description: "IdP generates a SAML Response containing a signed assertion about the user.",
-        from: 'auth', to: 'user', // User agent mediates the POST
+        description: `${provider.name} generates a signed SAML Response.`,
+        from: 'auth', to: 'user',
         nodes: { active: ['auth', 'user'], packet: { from: 'auth', to: 'user', label: 'Form HTML' } },
         details: { type: 'HTML Form', content: '<form action="https://sp.com/acs" method="POST">...</form>' }
     },
     {
         title: "5. POST to SP (ACS)",
-        description: "Browser auto-submits the form, POSTing the signed SAMLResponse to the SP's Assertion Consumer Service (ACS).",
+        description: "Browser POSTs the signed SAMLResponse to the SP's Assertion Consumer Service.",
         from: 'user', to: 'client',
         nodes: { active: ['user', 'client'], packet: { from: 'user', to: 'client', label: 'SAMLResponse' } },
         details: { type: 'HTTP POST', content: 'SAMLResponse=PHNhbWxwOlJlc3Bvbn...' }
     },
     {
         title: "6. Session Established",
-        description: "SP verifies the signature and attributes, then creates a local session for the user.",
+        description: "SP verifies the signature and attributes, then creates a local session.",
         from: 'client', to: 'client',
         nodes: { active: ['client'], packet: { from: 'client', to: 'client', label: 'Session' } },
         details: null
     }
 ];
 
-const deviceSteps = [
+const getDeviceSteps = (provider: ProviderConfig) => [
     {
         title: "1. Device Code Request",
-        description: "The input-constrained device (TV, console) calls the Auth Server to start flow.",
+        description: "The input-constrained device calls the Auth Server to start flow.",
         from: 'client', to: 'auth',
         nodes: { active: ['client', 'auth'], packet: { from: 'client', to: 'auth', label: 'POST /device' } },
-        details: { type: 'POST', content: 'client_id=123&scope=openid' }
+        details: { type: 'POST', content: `POST ${provider.tokenEndpoint}/device\nclient_id=123&scope=openid` }
     },
     {
         title: "2. Code Display",
-        description: "Auth Server returns a `user_code` (e.g., BCD-123) and `verification_uri`. Device shows these to user.",
+        description: `${provider.name} returns a \`user_code\` and \`verification_uri\`.`,
         from: 'auth', to: 'client',
         nodes: { active: ['auth', 'client'], packet: { from: 'auth', to: 'client', label: 'user_code' } },
         details: { type: 'JSON', content: '{"user_code": "BCD-123", "verification_uri": "app.com/activate"}' }
     },
     {
         title: "3. User Activation",
-        description: "User takes out their phone/laptop, goes to the URI, and enters the code.",
-        from: 'user', to: 'auth', // User uses secondary device (represented by user node here)
+        description: "User takes out their phone, goes to the URI, and enters the code.",
+        from: 'user', to: 'auth',
         nodes: { active: ['user', 'auth'], packet: { from: 'user', to: 'auth', label: 'Enter Code' } },
         details: { type: 'Browser', content: 'User enters "BCD-123"' }
     },
     {
         title: "4. Polling",
-        description: "Meanwhile, the Device polls the Auth Server: 'Is the user done yet?'",
+        description: "The Device polls the Auth Server: 'Is the user done yet?'",
         from: 'client', to: 'auth',
         nodes: { active: ['client', 'auth'], packet: { from: 'client', to: 'auth', label: 'Poll...' } },
         details: { type: 'POST /token', content: 'grant_type=device_code&device_code=...' }
     },
     {
         title: "5. Token Issue",
-        description: "Once user approves on phone, the next poll from Device receives the tokens.",
+        description: "Once user approves, the next poll receives the tokens.",
         from: 'auth', to: 'client',
         nodes: { active: ['auth', 'client'], packet: { from: 'auth', to: 'client', label: '{ tokens }' } },
         details: { type: 'JSON', content: '{"access_token": "..."}' }
@@ -218,32 +218,34 @@ const deviceSteps = [
 
 const FlowVisualizer: React.FC<FlowVisualizerProps> = ({ onSendToDecoder }) => {
   const [flowType, setFlowType] = useState<'oauth' | 'saml' | 'device'>('oauth');
+  const [providerId, setProviderId] = useState<string>('generic');
   const [currentStep, setCurrentStep] = useState(0);
   const [generatedData, setGeneratedData] = useState<string>('');
 
-  const steps = flowType === 'oauth' ? oauthSteps : (flowType === 'saml' ? samlSteps : deviceSteps);
+  const provider = providerConfigs[providerId];
+  const steps = flowType === 'oauth' ? getOauthSteps(provider) : (flowType === 'saml' ? getSamlSteps(provider) : getDeviceSteps(provider));
 
   useEffect(() => {
       setCurrentStep(0);
       generateData();
-  }, [flowType]);
+  }, [flowType, providerId]);
 
   const generateData = async () => {
     if (flowType !== 'saml') {
         const header = { alg: 'HS256', typ: 'JWT' };
         const payload = { 
-            iss: 'https://auth-server.com',
+            iss: provider.issuer,
             sub: 'user-789',
             aud: 'https://api.resource-server.com',
             exp: Math.floor(Date.now() / 1000) + 3600,
             iat: Math.floor(Date.now() / 1000),
-            scope: flowType === 'oauth' ? 'profile email' : 'device_sso'
+            scope: provider.scopes.join(' ')
         };
         const token = await jwtService.sign(header, payload, 'super-secret-key-for-resource-server');
         setGeneratedData(token);
     } else {
         const xml = xmlService.generateMockSamlResponse({
-            issuer: 'https://idp.example.com',
+            issuer: provider.issuer,
             subject: 'user@example.com',
             audience: 'https://sp.example.com',
             acsUrl: 'https://sp.example.com/acs',
@@ -285,30 +287,50 @@ const FlowVisualizer: React.FC<FlowVisualizerProps> = ({ onSendToDecoder }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-         <div>
-             <h2 className="text-2xl font-bold text-slate-900">Flow Visualizer</h2>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+         <div className="flex-1">
+             <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                Flow Visualizer
+                <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded border ${provider.id === 'google' ? 'bg-red-50 text-red-600 border-red-100' : provider.id === 'microsoft' ? 'bg-blue-50 text-blue-600 border-blue-100' : provider.id === 'okta' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-600 border-slate-100'}`}>
+                    {provider.name}
+                </span>
+             </h2>
              <p className="text-slate-600">Interactive walkthroughs of standard authentication protocols.</p>
          </div>
-         <div className="bg-slate-100 p-1 rounded-lg flex flex-wrap gap-1">
-             <button 
-                onClick={() => setFlowType('oauth')}
-                className={`px-3 py-2 rounded-md text-xs font-bold transition-colors ${flowType === 'oauth' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                OAuth 2.0
-            </button>
-            <button 
-                onClick={() => setFlowType('saml')}
-                className={`px-3 py-2 rounded-md text-xs font-bold transition-colors ${flowType === 'saml' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                SAML 2.0
-            </button>
-             <button 
-                onClick={() => setFlowType('device')}
-                className={`px-3 py-2 rounded-md text-xs font-bold transition-colors ${flowType === 'device' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Device Flow
-            </button>
+         
+         <div className="flex flex-col sm:flex-row gap-4">
+            <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1">
+                {Object.values(providerConfigs).map(p => (
+                    <button 
+                        key={p.id}
+                        onClick={() => setProviderId(p.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${providerId === p.id ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}
+                    >
+                        {p.name.split(' ')[0]}
+                    </button>
+                ))}
+            </div>
+
+            <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
+                <button 
+                    onClick={() => setFlowType('oauth')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${flowType === 'oauth' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    OAuth 2.0
+                </button>
+                <button 
+                    onClick={() => setFlowType('saml')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${flowType === 'saml' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    SAML 2.0
+                </button>
+                <button 
+                    onClick={() => setFlowType('device')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${flowType === 'device' ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Device Flow
+                </button>
+            </div>
          </div>
       </div>
 
@@ -329,16 +351,21 @@ const FlowVisualizer: React.FC<FlowVisualizerProps> = ({ onSendToDecoder }) => {
                 <Packet from={coords[step.nodes.packet.from]} to={coords[step.nodes.packet.to]} label={step.nodes.packet.label} />
             </svg>
             
-            <div className="absolute top-4 left-4 bg-white/80 backdrop-blur rounded-full px-3 py-1 text-xs font-bold text-slate-500 border border-slate-200">
-                Step {currentStep + 1} of {steps.length}
+            <div className="absolute top-4 left-4 flex gap-2">
+                <div className="bg-white/80 backdrop-blur rounded-full px-3 py-1 text-xs font-bold text-slate-500 border border-slate-200">
+                    Step {currentStep + 1} of {steps.length}
+                </div>
+                <div className={`bg-white/80 backdrop-blur rounded-full px-3 py-1 text-xs font-bold border border-slate-200 ${providerId === 'google' ? 'text-red-500' : providerId === 'microsoft' ? 'text-blue-500' : providerId === 'okta' ? 'text-indigo-500' : 'text-slate-500'}`}>
+                    {provider.name} Context
+                </div>
             </div>
         </div>
 
         <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                     <h3 className="text-xl font-bold text-slate-800">{step.title}</h3>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0">
                         <button onClick={handlePrev} disabled={currentStep === 0} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                             Previous
                         </button>
@@ -350,33 +377,43 @@ const FlowVisualizer: React.FC<FlowVisualizerProps> = ({ onSendToDecoder }) => {
                 <p className="text-slate-600 leading-relaxed">{step.description}</p>
                 
                 {step.details && (
-                    <div className="mt-4 bg-slate-900 rounded-lg p-4 text-slate-300 font-mono text-xs overflow-x-auto border border-slate-700 shadow-inner">
-                        <div className="text-slate-500 mb-2 uppercase text-[10px] font-bold tracking-wider">{step.details.type}</div>
-                        <pre>{step.details.content}</pre>
+                    <div className="mt-4 bg-slate-900 rounded-xl p-5 text-slate-300 font-mono text-xs overflow-x-auto border border-slate-700 shadow-2xl relative group">
+                        <div className="absolute top-4 right-4 text-slate-600 uppercase text-[10px] font-bold tracking-widest">{step.details.type}</div>
+                        <pre className="mt-2">{step.details.content}</pre>
                     </div>
                 )}
             </div>
 
-            <div className="lg:border-l border-slate-100 lg:pl-8 flex flex-col justify-center space-y-4">
+            <div className="lg:border-l border-slate-100 lg:pl-8 space-y-6">
                 <div className="p-4 bg-sky-50 rounded-xl border border-sky-100">
-                    <h4 className="text-sm font-bold text-sky-900 mb-2">What's happening?</h4>
+                    <h4 className="text-sm font-bold text-sky-900 mb-2 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></div>
+                        Protocol Insight
+                    </h4>
                     <ul className="text-sm text-sky-800 space-y-2 list-disc list-inside">
-                        {step.nodes.active.includes('user') && <li>User interacts manually.</li>}
-                        {step.nodes.active.includes('client') && <li>Application logic runs.</li>}
-                        {step.nodes.active.includes('auth') && <li>Server processes request.</li>}
+                        {step.nodes.active.includes('user') && <li>User Agent mediation required.</li>}
+                        {step.nodes.active.includes('client') && <li>Client logic processes redirect.</li>}
+                        {step.nodes.active.includes('auth') && <li>{provider.name} validates request.</li>}
                     </ul>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 className="text-sm font-bold text-slate-900 mb-3">{provider.name} Tips</h4>
+                    <div className="space-y-4">
+                        {provider.quirks.map((quirk, idx) => (
+                            <div key={idx} className="space-y-1">
+                                <div className="text-xs font-bold text-slate-700">{quirk.title}</div>
+                                <div className="text-[11px] text-slate-500 leading-relaxed">{quirk.description}</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 
                 {((flowType === 'oauth' && currentStep >= 5) || (flowType === 'device' && currentStep === 4)) && (
-                     <button onClick={handleInspect} className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors">
+                     <button onClick={handleInspect} className="w-full flex items-center justify-center gap-2 py-4 px-4 border border-transparent shadow-lg text-sm font-bold rounded-xl text-white bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all hover:scale-[1.02] active:scale-[0.98]">
                         <SendIcon className="h-4 w-4" />
                         Inspect Token
                     </button>
-                )}
-                 {flowType === 'saml' && currentStep >= 4 && (
-                    <div className="text-xs text-center text-slate-500 italic bg-slate-50 p-2 rounded border border-slate-200">
-                        Tip: Use the "SAML" tab to generate and inspect these XML responses yourself.
-                    </div>
                 )}
             </div>
         </div>

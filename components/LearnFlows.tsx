@@ -88,6 +88,18 @@ const LearnFlows: React.FC = () => {
           </ul>
            <p>OIDC builds on OAuth 2.0 to provide the SSO-like features that SAML is known for, but in a more modern, API-friendly way using JWTs.</p>
         </Card>
+
+        <Card title="Provider Specifics">
+          <p>
+            While OAuth and OIDC are standards, major providers implement them with unique flavors to enhance security or simplify developer experience:
+          </p>
+          <ul>
+            <li><strong>Google:</strong> Focuses on ease of use. Key quirks include the `prompt=consent` parameter to force consent screens and `access_type=offline` for refresh tokens.</li>
+            <li><strong>Microsoft (Entra ID):</strong> Uses a "Common" endpoint for multi-tenant apps and has a strong focus on Graph API integration for permissions.</li>
+            <li><strong>Okta:</strong> Enterprise-focused. They advocate for "Custom Authorization Servers" for fine-grained control and enforce PKCE on all public clients by default.</li>
+          </ul>
+          <p>Always consult the provider's official documentation for their specific implementation details and configuration endpoints.</p>
+        </Card>
       </div>
     </div>
   );
