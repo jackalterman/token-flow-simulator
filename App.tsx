@@ -23,6 +23,7 @@ import UuidGenerator from './components/UuidGenerator';
 import CronParser from './components/CronParser';
 import HarAnalyzer from './components/HarAnalyzer';
 import CollectionsView from './components/CollectionsView';
+import OidcTools from './components/OidcTools';
 import type { DecoderData } from './types';
 
 const App: React.FC = () => {
@@ -86,6 +87,10 @@ const App: React.FC = () => {
         return <HarAnalyzer onSendToDecoder={handleSendToDecoder} />;
       case AppView.COLLECTIONS:
         return <CollectionsView />;
+      case AppView.OIDC_DISCOVERY:
+        return <OidcTools activeSubView="discovery" />;
+      case AppView.OIDC_USERINFO:
+        return <OidcTools activeSubView="userinfo" />;
       default:
         return (
           <JwtDecoder

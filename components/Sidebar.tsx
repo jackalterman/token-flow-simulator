@@ -40,7 +40,9 @@ export enum AppView {
   UUID = 'UUID Generator',
   CRON = 'Cron Parser',
   HAR_ANALYZER = 'HAR Analyzer',
-  COLLECTIONS = 'My Collections'
+  COLLECTIONS = 'My Collections',
+  OIDC_DISCOVERY = 'OIDC Discovery',
+  OIDC_USERINFO = 'OIDC UserInfo'
 }
 
 interface SidebarProps {
@@ -71,6 +73,13 @@ const categories: Category[] = [
     name: 'Auth Protocols',
     items: [
       { id: AppView.SAML, label: 'SAML Tools', icon: CertificateIcon },
+    ],
+  },
+  {
+    name: 'OIDC',
+    items: [
+      { id: AppView.OIDC_DISCOVERY, label: 'Discovery Explorer', icon: SearchIcon },
+      { id: AppView.OIDC_USERINFO, label: 'UserInfo Fetcher', icon: UsersIcon },
     ],
   },
   {
