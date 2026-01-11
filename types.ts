@@ -44,3 +44,14 @@ export interface KeyPair {
     jwks: any;
     keyId: string;
 }
+
+export type ItemType = 'certificate' | 'jwt' | 'key' | 'secret';
+
+export interface CollectionItem {
+    id: string;
+    type: ItemType;
+    title: string;
+    content: string;
+    metadata: any;
+    timestamp: number;
+}

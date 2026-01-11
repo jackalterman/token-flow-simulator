@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import CodeBlock from './CodeBlock';
 import { jwtService } from '../services/jwtService';
-import { SendIcon, KeyIcon } from './icons';
+import { storageService } from '../services/storageService';
+import { SendIcon, KeyIcon, SaveIcon } from './icons';
 import type { DecoderData } from '../types';
 
 interface JwtEncoderProps {
@@ -219,10 +220,28 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
                     </p>
                     <button
                         onClick={handleSend}
-                        className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors"
+                        className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 mb-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors"
                     >
                         <SendIcon className="h-5 w-5" />
                         Send to Decoder
+                    </button>
+                    <button
+                        onClick={() => {
+                            storageService.saveItem({
+                                type: 'jwt',
+                                title: `JWT - ${JSON.parse(payload).sub || 'Untitled'}`,
+                                content: generatedToken,
+                                metadata: {
+                                    iss: JSON.parse(payload).iss,
+                                    alg: JSON.parse(header).alg
+                                }
+                            });
+                            alert('JWT saved to collection!');
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-300 shadow-sm text-sm font-bold rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+                    >
+                        <SaveIcon className="h-4 w-4" />
+                        Save to Collection
                     </button>
                 </div>
             </div>

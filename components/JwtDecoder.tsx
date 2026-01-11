@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import CodeBlock from './CodeBlock';
 import JsonViewer from './JsonViewer';
 import { jwtService } from '../services/jwtService';
+import { storageService } from '../services/storageService';
 import type { DecodedJwt, VerificationResult, DecoderData } from '../types';
-import { CheckIcon, AlertTriangleIcon } from './icons';
+import { CheckIcon, AlertTriangleIcon, SaveIcon } from './icons';
 
 interface JwtDecoderProps {
   initialData: DecoderData | null;
@@ -163,6 +164,28 @@ const JwtDecoder: React.FC<JwtDecoderProps> = ({ initialData, onDataHandled }) =
                 >
                     Verify Token
                 </button>
+
+                {token && (
+                    <button
+                        onClick={() => {
+                            storageService.saveItem({
+                                type: 'jwt',
+                                title: `JWT - ${decoded?.payload?.sub || 'Untitled'}`,
+                                content: token,
+                                metadata: {
+                                    iss: decoded?.payload?.iss,
+                                    exp: decoded?.payload?.exp,
+                                    alg: decoded?.header?.alg
+                                }
+                            });
+                            alert('JWT saved to collection!');
+                        }}
+                        className="w-full inline-flex justify-center items-center gap-2 py-2.5 px-4 border border-slate-300 shadow-sm text-sm font-bold rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+                    >
+                        <SaveIcon className="h-4 w-4" />
+                        Save to Collection
+                    </button>
+                )}
             </div>
              {renderVerificationStatus()}
         </div>

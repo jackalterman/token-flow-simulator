@@ -22,6 +22,7 @@ import PasswordAnalyzer from './components/PasswordAnalyzer';
 import UuidGenerator from './components/UuidGenerator';
 import CronParser from './components/CronParser';
 import HarAnalyzer from './components/HarAnalyzer';
+import CollectionsView from './components/CollectionsView';
 import type { DecoderData } from './types';
 
 const App: React.FC = () => {
@@ -83,6 +84,8 @@ const App: React.FC = () => {
         return <CronParser />;
       case AppView.HAR_ANALYZER:
         return <HarAnalyzer onSendToDecoder={handleSendToDecoder} />;
+      case AppView.COLLECTIONS:
+        return <CollectionsView />;
       default:
         return (
           <JwtDecoder

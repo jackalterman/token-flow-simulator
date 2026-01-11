@@ -14,6 +14,7 @@ import {
   CertificateIcon,
   UsersIcon,
   ArrowRightIcon,
+  BookmarkIcon,
   SearchIcon as DetailIcon
 } from './icons';
 
@@ -38,7 +39,8 @@ export enum AppView {
   PASSWORD = 'Password Analyzer',
   UUID = 'UUID Generator',
   CRON = 'Cron Parser',
-  HAR_ANALYZER = 'HAR Analyzer'
+  HAR_ANALYZER = 'HAR Analyzer',
+  COLLECTIONS = 'My Collections'
 }
 
 interface SidebarProps {
@@ -62,7 +64,6 @@ const categories: Category[] = [
       { id: AppView.DECODE, label: 'JWT Decoder', icon: SearchIcon },
       { id: AppView.ENCODE, label: 'JWT Encoder', icon: FileCodeIcon },
       { id: AppView.DIFF, label: 'Token Diff', icon: ScaleIcon },
-      { id: AppView.SCOPES, label: 'Scope Explorer', icon: UsersIcon },
       { id: AppView.PKCE, label: 'PKCE Generator', icon: RefreshIcon },
     ],
   },
@@ -70,9 +71,15 @@ const categories: Category[] = [
     name: 'Auth Protocols',
     items: [
       { id: AppView.SAML, label: 'SAML Tools', icon: CertificateIcon },
+    ],
+  },
+  {
+    name: 'Educational',
+    items: [
       { id: AppView.FLOWS, label: 'Flow Visualizer', icon: ShuffleIcon },
       { id: AppView.SIMULATE, label: 'Failure Simulator', icon: ShieldCheckIcon },
       { id: AppView.LEARN, label: 'Learn Flows', icon: InfoIcon },
+      { id: AppView.SCOPES, label: 'Scope Explorer', icon: UsersIcon },
     ],
   },
   {
@@ -95,6 +102,12 @@ const categories: Category[] = [
       { id: AppView.CRON, label: 'Cron Parser', icon: RefreshIcon },
       { id: AppView.KEYS, label: 'Key Manager', icon: KeyIcon },
       { id: AppView.SECRETS, label: 'Secret Generator', icon: LockClosedIcon },
+    ],
+  },
+  {
+    name: 'Saved',
+    items: [
+      { id: AppView.COLLECTIONS, label: 'Collections', icon: BookmarkIcon },
     ],
   },
 ];

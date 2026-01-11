@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import CodeBlock from './CodeBlock';
 import { certificateService, type CertificateInfo } from '../services/certificateService';
+import { storageService } from '../services/storageService';
 import { 
   SearchIcon, 
   DownloadIcon, 
@@ -139,9 +140,20 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = () => {
                       {index + 1}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs font-bold truncate ${selectedCertIndex === index ? 'text-sky-700' : 'text-slate-600'}`}>
-                        {index === 0 ? 'Latest Certificate' : `Entry #${index + 1}`}
-                      </p>
+                      <div className="flex justify-between items-center mb-1">
+                        <p className={`text-xs font-bold truncate ${selectedCertIndex === index ? 'text-sky-700' : 'text-slate-600'}`}>
+                          {index === 0 ? 'Latest Certificate' : `Entry #${index + 1}`}
+                        </p>
+                        {cert.type && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                            cert.type === 'Leaf' ? 'bg-green-100 text-green-700' :
+                            cert.type === 'Root' ? 'bg-purple-100 text-purple-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {cert.type}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-400 truncate mt-0.5">
                         {cert.subject.split(',')[0]}
                       </p>
@@ -170,7 +182,18 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = () => {
                   <CertificateIcon className="h-5 w-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900">Certificate Details</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-slate-900">Certificate Details</h4>
+                    {selectedCert?.type && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                        selectedCert.type === 'Leaf' ? 'bg-green-100 text-green-700' :
+                        selectedCert.type === 'Root' ? 'bg-purple-100 text-purple-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {selectedCert.type}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[10px] text-slate-500">Position {selectedCertIndex + 1} in analysis</p>
                 </div>
               </div>
@@ -224,8 +247,20 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = () => {
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                <button 
                  onClick={() => {
-                   // Mock save to list
-                   alert('Saved to local storage (Simulated)');
+                   if (!selectedCert) return;
+                   storageService.saveItem({
+                     type: 'certificate',
+                     title: selectedCert.subject.split(',')[0],
+                     content: selectedCert.pem,
+                     metadata: {
+                       issuer: selectedCert.issuer,
+                       validFrom: selectedCert.validFrom,
+                       validTo: selectedCert.validTo,
+                       serial: selectedCert.serialNumber,
+                       thumbprint: selectedCert.thumbprint
+                     }
+                   });
+                   alert('Certificate saved to your collection!');
                  }}
                  className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 text-white text-sm font-bold rounded-lg hover:bg-sky-700 transition-colors shadow-sm"
                >

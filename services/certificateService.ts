@@ -1,3 +1,5 @@
+export type CertificateType = 'Leaf' | 'Intermediate' | 'Root' | 'Unknown';
+
 export interface CertificateInfo {
   subject: string;
   issuer: string;
@@ -6,6 +8,7 @@ export interface CertificateInfo {
   serialNumber: string;
   thumbprint: string;
   pem: string;
+  type?: CertificateType;
 }
 
 export const certificateService = {
@@ -38,7 +41,8 @@ export const certificateService = {
         validTo: cert.not_after,
         serialNumber: cert.id || 'N/A',
         thumbprint: cert.tbs_sha256 || 'N/A',
-        pem: cert.cert?.pem || `-----BEGIN CERTIFICATE-----\n${cert.pubkey_sha256}\n-----END CERTIFICATE-----`
+        pem: cert.cert?.pem || `-----BEGIN CERTIFICATE-----\n${cert.pubkey_sha256}\n-----END CERTIFICATE-----`,
+        type: (Array.isArray(cert.dns_names) && cert.dns_names.length > 0) ? 'Leaf' : 'Unknown'
       }));
     } catch (error) {
       console.error('Error fetching certificates:', error);
@@ -79,6 +83,13 @@ export const certificateService = {
     if (info.subject === 'Unknown Subject' && pem.includes('BEGIN CERTIFICATE')) {
        // Placeholder indicating it's a valid PEM but parsing failed
        info.subject = 'Encoded Certificate (Raw PEM)';
+    }
+
+    // Basic type detection
+    if (info.subject !== 'Unknown Subject' && info.issuer !== 'Unknown Issuer') {
+        if (info.subject === info.issuer) {
+            info.type = 'Root';
+        }
     }
 
     return info;
