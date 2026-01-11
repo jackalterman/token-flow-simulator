@@ -273,5 +273,50 @@ export const jwtService = {
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
+  },
+
+  async fetchJwks(issuer: string): Promise<any> {
+    try {
+      const discoveryUrl = issuer.replace(/\/$/, '') + '/.well-known/openid-configuration';
+      const response = await fetch(discoveryUrl);
+      const config = await response.json();
+      if (!config.jwks_uri) throw new Error('No JWKS URI found in discovery document');
+      
+      const jwksResponse = await fetch(config.jwks_uri);
+      return await jwksResponse.json();
+    } catch (e: any) {
+      throw new Error(`Failed to fetch JWKS: ${e.message}`);
+    }
+  },
+
+  async validateIdToken(token: string, issuer: string, audience: string): Promise<VerificationResult> {
+    const decoded = this.decode(token);
+    if (!decoded) return { isValid: false, reason: 'Malformed token' };
+
+    if (decoded.payload.iss !== issuer) {
+      return { isValid: false, reason: `Issuer mismatch. Expected ${issuer}, got ${decoded.payload.iss}` };
+    }
+
+    if (decoded.payload.aud !== audience) {
+      return { isValid: false, reason: `Audience mismatch. Expected ${audience}, got ${decoded.payload.aud}` };
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (decoded.payload.exp && decoded.payload.exp < now) {
+      return { isValid: false, reason: 'Token has expired' };
+    }
+
+    try {
+      const jwks = await this.fetchJwks(issuer);
+      const kid = decoded.header.kid;
+      const key = jwks.keys.find((k: any) => k.kid === kid);
+      
+      if (!key) {
+        return { isValid: false, reason: `Key with kid "${kid}" not found in JWKS` };
+      }
+      return { isValid: true, reason: 'Token claims are valid and matching key found in JWKS.' };
+    } catch (e: any) {
+      return { isValid: false, reason: `Signature verification failed: ${e.message}` };
+    }
   }
 };

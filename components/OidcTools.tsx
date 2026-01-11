@@ -1,292 +1,246 @@
-import React, { useState } from 'react';
-import { SearchIcon, UsersIcon, ShieldCheckIcon, AlertTriangleIcon, ClipboardIcon } from './icons';
+
+import React, { useState, useEffect } from 'react';
+import { SearchIcon, UsersIcon, ShieldCheckIcon, AlertTriangleIcon, ClipboardIcon, KeyIcon, FileCodeIcon } from './icons';
 import CodeBlock from './CodeBlock';
+import { jwtService } from '../services/jwtService';
 
 interface OidcToolsProps {
-  activeSubView?: 'discovery' | 'userinfo';
+    activeSubView?: 'discovery' | 'userinfo' | 'validator' | 'assertion';
 }
 
-const OidcTools: React.FC<OidcToolsProps> = ({ activeSubView = 'discovery' }) => {
-  const [issuer, setIssuer] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [config, setConfig] = useState<any>(null);
+const OidcTools: React.FC<OidcToolsProps> = ({ activeSubView }) => {
+    const [subView, setSubView] = useState(activeSubView || 'discovery');
+    const [loading, setLoading] = useState(false);
 
-  const [accessToken, setAccessToken] = useState('');
-  const [userInfoEndpoint, setUserInfoEndpoint] = useState('');
-  const [userInfo, setUserInfo] = useState<any>(null);
-
-  const isValidUrl = (url: string) => {
-    try {
-      new URL(url.startsWith('http') ? url : `https://${url}`);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const fetchWithHandling = async (url: string, options?: RequestInit) => {
-    const response = await fetch(url, options);
-    const contentType = response.headers.get('content-type');
-    
-    if (!response.ok) {
-      let details = '';
-      if (contentType?.includes('application/json')) {
-        const errData = await response.json();
-        details = errData.error_description || errData.error || errData.message || '';
-      }
-      throw new Error(`Server returned ${response.status}${details ? ': ' + details : ''}`);
-    }
-
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Expected JSON response but received ' + (contentType || 'unknown content type') + '. Check if the URL is a valid OIDC endpoint.');
-    }
-
-    return await response.json();
-  };
-
-  const fetchConfig = async () => {
-    if (!issuer) return;
-    if (!isValidUrl(issuer)) {
-      setError('Please enter a valid URL or domain (e.g. accounts.google.com)');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setConfig(null);
-
-    let url = issuer;
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-    
-    url = url.replace(/\/$/, '');
-    if (!url.includes('.well-known')) {
-      url = `${url}/.well-known/openid-configuration`;
-    }
-
-    try {
-      const data = await fetchWithHandling(url);
-      setConfig(data);
-      if (data.userinfo_endpoint) {
-        setUserInfoEndpoint(data.userinfo_endpoint);
-      }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while fetching configuration');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUserInfo = async () => {
-    if (!userInfoEndpoint || !accessToken) return;
-    if (!isValidUrl(userInfoEndpoint)) {
-      setError('UserInfo Endpoint must be a valid URL');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setUserInfo(null);
-
-    try {
-      const data = await fetchWithHandling(userInfoEndpoint, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
+    useEffect(() => {
+        if (activeSubView) {
+            setSubView(activeSubView);
         }
-      });
-      setUserInfo(data);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while fetching user info');
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, [activeSubView]);
+    const [error, setError] = useState<string | null>(null);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+    // Discovery State
+    const [issuer, setIssuer] = useState('');
+    const [config, setConfig] = useState<any>(null);
 
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-sky-50 p-2 rounded-lg">
-              {activeSubView === 'discovery' ? (
-                <SearchIcon className="h-6 w-6 text-sky-600" />
-              ) : (
-                <UsersIcon className="h-6 w-6 text-sky-600" />
-              )}
+    // UserInfo State
+    const [accessToken, setAccessToken] = useState('');
+    const [userInfoEndpoint, setUserInfoEndpoint] = useState('');
+    const [userInfo, setUserInfo] = useState<any>(null);
+
+    // Validator State
+    const [idToken, setIdToken] = useState('');
+    const [valIssuer, setValIssuer] = useState('');
+    const [valAudience, setValAudience] = useState('');
+    const [validationResult, setValidationResult] = useState<any>(null);
+
+    // Assertion State
+    const [assIssuer, setAssIssuer] = useState('client-id');
+    const [assSubject, setAssSubject] = useState('client-id');
+    const [assAudience, setAssAudience] = useState('https://idp.example.com/token');
+    const [assPrivateKey, setAssPrivateKey] = useState('');
+    const [generatedAssertion, setGeneratedAssertion] = useState('');
+
+    const isValidUrl = (url: string) => {
+        try {
+            new URL(url.startsWith('http') ? url : `https://${url}`);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const fetchConfig = async () => {
+        if (!issuer) return;
+        setLoading(true);
+        setError(null);
+        try {
+            let url = issuer.replace(/\/$/, '');
+            if (!url.includes('.well-known')) url = `${url}/.well-known/openid-configuration`;
+            const response = await fetch(url);
+            const data = await response.json();
+            setConfig(data);
+            if (data.userinfo_endpoint) setUserInfoEndpoint(data.userinfo_endpoint);
+        } catch (err: any) {
+            setError(err.message || 'Failed to fetch OIDC config');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchUserInfo = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await fetch(userInfoEndpoint, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            const data = await response.json();
+            setUserInfo(data);
+        } catch (err: any) {
+            setError(err.message || 'Failed to fetch UserInfo');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const validateToken = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const result = await jwtService.validateIdToken(idToken, valIssuer, valAudience);
+            setValidationResult(result);
+        } catch (err: any) {
+            setError(err.message || 'Validation failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const generateAssertion = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const now = Math.floor(Date.now() / 1000);
+            const payload = {
+                iss: assIssuer,
+                sub: assSubject,
+                aud: assAudience,
+                iat: now,
+                exp: now + 300,
+                jti: crypto.randomUUID()
+            };
+            const header = { alg: 'RS256', typ: 'JWT' };
+            const token = await jwtService.sign(header as any, payload, assPrivateKey);
+            setGeneratedAssertion(token);
+        } catch (err: any) {
+            setError(err.message || 'Generation failed. Ensure you have a valid private key.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); };
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl shadow-inner mb-6">
+                {[
+                    { id: 'discovery', label: 'Discovery', icon: SearchIcon },
+                    { id: 'userinfo', label: 'UserInfo', icon: UsersIcon },
+                    { id: 'validator', label: 'Validator', icon: ShieldCheckIcon },
+                    { id: 'assertion', label: 'Assertion', icon: KeyIcon }
+                ].map(tab => (
+                    <button key={tab.id} onClick={() => setSubView(tab.id as any)} className={`flex items-center justify-center space-x-2 py-2 rounded-lg text-xs font-bold transition-all ${subView === tab.id ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                        <tab.icon className="h-3 w-3" />
+                        <span>{tab.label}</span>
+                    </button>
+                ))}
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-800">
-                {activeSubView === 'discovery' ? 'Discovery Explorer' : 'UserInfo Fetcher'}
-              </h3>
-              <p className="text-sm text-slate-500">
-                {activeSubView === 'discovery' 
-                  ? 'Inspect OIDC identity provider configuration' 
-                  : 'Test fetching user profile data with an access token'}
-              </p>
-            </div>
-          </div>
-        </div>
 
-        <div className="p-6">
-          {activeSubView === 'discovery' ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Issuer URL or Domain
-                </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={issuer}
-                    onChange={(e) => setIssuer(e.target.value)}
-                    placeholder="e.g. accounts.google.com or https://okta.com/oauth2/default"
-                    className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
-                  />
-                  <button
-                    onClick={fetchConfig}
-                    disabled={loading || !issuer}
-                    className="px-6 py-2 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 disabled:opacity-50 transition-colors shadow-sm"
-                  >
-                    {loading ? 'Fetching...' : 'Fetch Config'}
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-slate-400">
-                  Will attempt to fetch from <code>{issuer || 'domain'}/.well-known/openid-configuration</code>
-                </p>
-              </div>
-
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex items-center space-x-3 text-red-700 animate-fade-in">
-                  <AlertTriangleIcon className="h-5 w-5 flex-shrink-0" />
-                  <p className="text-sm font-medium">{error}</p>
-                </div>
-              )}
-
-              {config && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Key Endpoints</h4>
-                      <div className="space-y-2">
-                        {['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint', 'jwks_uri'].map(key => config[key] && (
-                          <div key={key} className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 font-mono">{key}</span>
-                            <div className="flex items-center group">
-                                <span className="text-xs font-medium text-slate-700 truncate">{config[key]}</span>
-                                <button onClick={() => copyToClipboard(config[key])} className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-200 rounded">
-                                    <ClipboardIcon className="h-3 w-3 text-slate-500" />
-                                </button>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
+                <div className="p-6">
+                    {subView === 'discovery' && (
+                        <div className="space-y-4 animate-fade-in">
+                            <label className="block text-sm font-bold text-slate-700">Issuer URL</label>
+                            <div className="flex space-x-2">
+                                <input type="text" value={issuer} onChange={e => setIssuer(e.target.value)} placeholder="e.g. accounts.google.com" className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm" />
+                                <button onClick={fetchConfig} disabled={loading || !issuer} className="px-6 py-2 bg-sky-600 text-white font-bold rounded-lg text-sm hover:bg-sky-700 disabled:opacity-50 transition-colors">Fetch</button>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Capabilities</h4>
-                      <div className="flex flex-wrap gap-2">
-                          {(config.scopes_supported || []).map((scope: string) => (
-                              <span key={scope} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">
-                                  {scope}
-                              </span>
-                          ))}
-                           {(config.response_types_supported || []).map((type: string) => (
-                              <span key={type} className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold">
-                                  {type}
-                              </span>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-700 mb-2">Raw Configuration</h4>
-                    <CodeBlock code={JSON.stringify(config, null, 2)} language="json" />
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    UserInfo Endpoint
-                  </label>
-                  <input
-                    type="text"
-                    value={userInfoEndpoint}
-                    onChange={(e) => setUserInfoEndpoint(e.target.value)}
-                    placeholder="https://accounts.google.com/oauth2/v3/userinfo"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    Access Token
-                  </label>
-                  <input
-                    type="password"
-                    value={accessToken}
-                    onChange={(e) => setAccessToken(e.target.value)}
-                    placeholder="ya29.a0AfH6..."
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={fetchUserInfo}
-                disabled={loading || !userInfoEndpoint || !accessToken}
-                className="w-full py-2 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 disabled:opacity-50 transition-colors shadow-sm"
-              >
-                {loading ? 'Fetching Profile...' : 'Fetch UserInfo'}
-              </button>
-
-              {error && (
-                <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex items-center space-x-3 text-red-700 animate-fade-in">
-                  <AlertTriangleIcon className="h-5 w-5 flex-shrink-0" />
-                  <p className="text-sm font-medium">{error}</p>
-                </div>
-              )}
-
-              {userInfo && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 flex items-center space-x-4">
-                    {userInfo.picture && (
-                        <img src={userInfo.picture} alt="Profile" className="h-12 w-12 rounded-full border border-white shadow-sm" />
+                            {config && <CodeBlock code={JSON.stringify(config, null, 2)} language="json" />}
+                        </div>
                     )}
-                    <div>
-                        <h4 className="text-base font-bold text-slate-800">{userInfo.name || userInfo.preferred_username || 'User Profile'}</h4>
-                        <p className="text-sm text-slate-500">{userInfo.email}</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-700 mb-2">Resource Metadata</h4>
-                    <CodeBlock code={JSON.stringify(userInfo, null, 2)} language="json" />
-                  </div>
+
+                    {subView === 'userinfo' && (
+                        <div className="space-y-4 animate-fade-in">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">UserInfo Endpoint</label>
+                                    <input type="text" value={userInfoEndpoint} onChange={e => setUserInfoEndpoint(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Access Token</label>
+                                    <input type="password" value={accessToken} onChange={e => setAccessToken(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" />
+                                </div>
+                            </div>
+                            <button onClick={fetchUserInfo} disabled={loading || !accessToken} className="w-full py-2 bg-sky-600 text-white font-bold rounded-lg text-sm hover:bg-sky-700 transition-colors">Fetch Profile</button>
+                            {userInfo && <CodeBlock code={JSON.stringify(userInfo, null, 2)} language="json" />}
+                        </div>
+                    )}
+
+                    {subView === 'validator' && (
+                        <div className="space-y-4 animate-fade-in">
+                            <label className="block text-sm font-bold text-slate-700">ID Token</label>
+                            <textarea rows={4} value={idToken} onChange={e => setIdToken(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-xs font-mono" placeholder="Paste ID Token (JWT)..." />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expected Issuer</label>
+                                    <input type="text" value={valIssuer} onChange={e => setValIssuer(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" placeholder="https://accounts.google.com" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expected Audience</label>
+                                    <input type="text" value={valAudience} onChange={e => setValAudience(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" placeholder="Client ID" />
+                                </div>
+                            </div>
+                            <button onClick={validateToken} className="w-full py-2 bg-green-600 text-white font-bold rounded-lg text-sm hover:bg-green-700 transition-colors">Validate Claims & Key</button>
+                            {validationResult && (
+                                <div className={`p-4 rounded-lg border ${validationResult.isValid ? 'bg-green-50 border-green-100 text-green-800' : 'bg-red-50 border-red-100 text-red-800'}`}>
+                                    <div className="flex items-center space-x-2">
+                                        {validationResult.isValid ? <ShieldCheckIcon className="h-5 w-5" /> : <AlertTriangleIcon className="h-5 w-5" />}
+                                        <span className="font-bold">{validationResult.isValid ? 'Valid' : 'Invalid'}</span>
+                                    </div>
+                                    <p className="mt-1 text-sm">{validationResult.reason}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {subView === 'assertion' && (
+                        <div className="space-y-4 animate-fade-in">
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Issuer (Client ID)</label>
+                                    <input type="text" value={assIssuer} onChange={e => setAssIssuer(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Audience (Token URL)</label>
+                                    <input type="text" value={assAudience} onChange={e => setAssAudience(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Algorithm</label>
+                                    <input type="text" value="RS256" disabled className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Private Key (PEM)</label>
+                                <textarea rows={6} value={assPrivateKey} onChange={e => setAssPrivateKey(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg text-[10px] font-mono" placeholder="-----BEGIN PRIVATE KEY-----..." />
+                                <p className="mt-1 text-[10px] text-slate-400italic">Use Key Manager to generate a pair if needed.</p>
+                            </div>
+                            <button onClick={generateAssertion} className="w-full py-2 bg-sky-600 text-white font-bold rounded-lg text-sm hover:bg-sky-700 transition-colors">Generate Assertion JWT</button>
+                            {generatedAssertion && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-sm font-bold text-slate-700">Generated JWT</label>
+                                        <button onClick={() => copyToClipboard(generatedAssertion)} className="text-sky-600 hover:text-sky-700 text-xs font-bold flex items-center">
+                                            <ClipboardIcon className="h-3 w-3 mr-1" /> Copy
+                                        </button>
+                                    </div>
+                                    <div className="p-3 bg-slate-900 rounded-lg text-cyan-300 font-mono text-xs break-all leading-relaxed">{generatedAssertion}</div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-lg flex items-center space-x-3 text-red-700">
+                            <AlertTriangleIcon className="h-5 w-5 flex-shrink-0" />
+                            <p className="text-sm font-medium">{error}</p>
+                        </div>
+                    )}
                 </div>
-              )}
             </div>
-          )}
         </div>
-      </div>
-      
-      <div className="p-4 bg-amber-50 rounded-lg border border-amber-100 flex items-start space-x-3 text-amber-800">
-        <ShieldCheckIcon className="h-5 w-5 mt-0.5 flex-shrink-0" />
-        <div className="text-xs">
-          <p className="font-bold mb-1">CORS Notice</p>
-          <p>Browsers enforce Cross-Origin Resource Sharing (CORS). Some identity providers may block direct browser-side requests to their configuration or UserInfo endpoints unless specifically configured or using a proxy.</p>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default OidcTools;

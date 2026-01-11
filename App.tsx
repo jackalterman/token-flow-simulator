@@ -24,6 +24,9 @@ import CronParser from './components/CronParser';
 import HarAnalyzer from './components/HarAnalyzer';
 import CollectionsView from './components/CollectionsView';
 import OidcTools from './components/OidcTools';
+import XswSimulator from './components/XswSimulator';
+import DeviceFlowVisualizer from './components/DeviceFlowVisualizer';
+import LogoutExplorer from './components/LogoutExplorer';
 import type { DecoderData } from './types';
 
 const App: React.FC = () => {
@@ -66,7 +69,11 @@ const App: React.FC = () => {
       case AppView.SCOPES:
         return <ScopeExplorer />;
       case AppView.LEARN:
-        return <LearnFlows />;
+        return <LearnFlows setActiveView={(view: AppView) => {
+            const sidebar = document.querySelector('nav');
+            if (sidebar) sidebar.scrollTo({ top: 0, behavior: 'smooth' });
+            setActiveView(view);
+        }} />;
       case AppView.BASE64:
         return <Base64Tool />;
       case AppView.URL:
@@ -91,6 +98,16 @@ const App: React.FC = () => {
         return <OidcTools activeSubView="discovery" />;
       case AppView.OIDC_USERINFO:
         return <OidcTools activeSubView="userinfo" />;
+      case AppView.OIDC_VALIDATOR:
+        return <OidcTools activeSubView="validator" />;
+      case AppView.OIDC_ASSERTION:
+        return <OidcTools activeSubView="assertion" />;
+      case AppView.XSW_SIMULATOR:
+        return <XswSimulator />;
+      case AppView.DEVICE_FLOW:
+        return <DeviceFlowVisualizer />;
+      case AppView.LOGOUT_EXPLORER:
+        return <LogoutExplorer />;
       default:
         return (
           <JwtDecoder

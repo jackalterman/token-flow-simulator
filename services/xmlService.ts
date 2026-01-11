@@ -20,7 +20,7 @@ export const xmlService = {
     attributes: Record<string, string>;
     issueInstant?: string;
   }): string {
-    const id = '_' + Math.random().toString(36).substr(2, 9);
+    const id = '_' + Math.random().toString(36).substring(2, 11);
     const instant = params.issueInstant || new Date().toISOString();
     const notOnOrAfter = new Date(Date.now() + 3600000).toISOString(); // +1 hour
 
@@ -44,7 +44,7 @@ export const xmlService = {
   </samlp:Status>
   <saml:Assertion xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xmlns:xs="http://www.w3.org/2001/XMLSchema"
-                  ID="${'_' + Math.random().toString(36).substr(2, 9)}"
+                  ID="${'_' + Math.random().toString(36).substring(2, 11)}"
                   Version="2.0"
                   IssueInstant="${instant}">
     <saml:Issuer>${params.issuer}</saml:Issuer>
@@ -85,5 +85,58 @@ export const xmlService = {
     </saml:AttributeStatement>
   </saml:Assertion>
 </samlp:Response>`.trim();
+  },
+
+  generateMockSamlRequest(params: {
+    issuer: string;
+    acsUrl: string;
+    destination: string;
+  }): string {
+    const id = '_' + Math.random().toString(36).substring(2, 11);
+    const instant = new Date().toISOString();
+
+    return `
+<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                    xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                    ID="${id}"
+                    Version="2.0"
+                    IssueInstant="${instant}"
+                    AssertionConsumerServiceURL="${params.acsUrl}"
+                    Destination="${params.destination}"
+                    ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST">
+  <saml:Issuer>${params.issuer}</saml:Issuer>
+  <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+                      AllowCreate="true"/>
+  <samlp:RequestedAuthnContext Comparison="exact">
+    <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef>
+  </samlp:RequestedAuthnContext>
+</samlp:AuthnRequest>`.trim();
+  },
+
+  generateMockSamlMetadata(params: {
+    entityId: string;
+    acsUrl?: string;
+    ssoUrl?: string;
+    type: 'sp' | 'idp';
+  }): string {
+    const isSP = params.type === 'sp';
+    return `
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                     entityID="${params.entityId}">
+  ${isSP ? `
+  <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                                 Location="${params.acsUrl || 'https://sp.example.com/acs'}"
+                                 index="1"/>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+  </md:SPSSODescriptor>
+  ` : `
+  <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                            Location="${params.ssoUrl || 'https://idp.example.com/sso'}"/>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
+  </md:IDPSSODescriptor>
+  `}
+</md:EntityDescriptor>`.trim();
   }
 };

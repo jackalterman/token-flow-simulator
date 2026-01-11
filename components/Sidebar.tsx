@@ -15,7 +15,10 @@ import {
   UsersIcon,
   ArrowRightIcon,
   BookmarkIcon,
-  SearchIcon as DetailIcon
+  SearchIcon as DetailIcon,
+  MonitorIcon,
+  LogOutIcon,
+  AlertTriangleIcon
 } from './icons';
 
 export enum AppView {
@@ -42,7 +45,12 @@ export enum AppView {
   HAR_ANALYZER = 'HAR Analyzer',
   COLLECTIONS = 'My Collections',
   OIDC_DISCOVERY = 'OIDC Discovery',
-  OIDC_USERINFO = 'OIDC UserInfo'
+  OIDC_USERINFO = 'OIDC UserInfo',
+  OIDC_VALIDATOR = 'ID Token Validator',
+  OIDC_ASSERTION = 'Assertion Generator',
+  XSW_SIMULATOR = 'XSW Simulator',
+  DEVICE_FLOW = 'Device Flow',
+  LOGOUT_EXPLORER = 'Logout Explorer'
 }
 
 interface SidebarProps {
@@ -80,12 +88,17 @@ const categories: Category[] = [
     items: [
       { id: AppView.OIDC_DISCOVERY, label: 'Discovery Explorer', icon: SearchIcon },
       { id: AppView.OIDC_USERINFO, label: 'UserInfo Fetcher', icon: UsersIcon },
+      { id: AppView.OIDC_VALIDATOR, label: 'ID Token Validator', icon: ShieldCheckIcon },
+      { id: AppView.OIDC_ASSERTION, label: 'Assertion Generator', icon: KeyIcon },
     ],
   },
   {
     name: 'Educational',
     items: [
       { id: AppView.FLOWS, label: 'Flow Visualizer', icon: ShuffleIcon },
+      { id: AppView.XSW_SIMULATOR, label: 'XSW Simulator', icon: AlertTriangleIcon },
+      { id: AppView.DEVICE_FLOW, label: 'Device Flow', icon: MonitorIcon },
+      { id: AppView.LOGOUT_EXPLORER, label: 'Logout Explorer', icon: LogOutIcon },
       { id: AppView.SIMULATE, label: 'Failure Simulator', icon: ShieldCheckIcon },
       { id: AppView.LEARN, label: 'Learn Flows', icon: InfoIcon },
       { id: AppView.SCOPES, label: 'Scope Explorer', icon: UsersIcon },
