@@ -1,6 +1,6 @@
 import { CollectionItem } from '../types';
 
-const STORAGE_KEY = 'tokenflow_collection';
+const STORAGE_KEY = 'SecurityTribeToolkit_collection';
 
 export const storageService = {
   saveItem(item: Omit<CollectionItem, 'id' | 'timestamp'>): CollectionItem {

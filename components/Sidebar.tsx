@@ -144,9 +144,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-900 tracking-tight leading-none">
-              TokenFlow
+              Security Tribe
             </h2>
-            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-1">Toolbox</p>
+            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-1">Toolkit</p>
           </div>
         </div>
       </div>

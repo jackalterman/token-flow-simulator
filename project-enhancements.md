@@ -1,4 +1,4 @@
-# Token Flow Simulator - Enhancement Recommendations
+# Security Tribe Toolkit - Enhancement Recommendations
 
 ## Overview
 This document contains enhancement recommendations from a cryptography and computer science perspective. These suggestions aim to elevate the Token Flow Simulator from a solid educational tool to an exceptional one.

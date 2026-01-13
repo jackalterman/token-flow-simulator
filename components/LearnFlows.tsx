@@ -29,7 +29,7 @@ const LearnFlows: React.FC<LearnFlowsProps> = ({ setActiveView }) => {
       <div>
         <h2 className="text-2xl font-bold mb-2 text-slate-900">Learning Center</h2>
         <p className="text-slate-600 max-w-3xl text-sm">
-            Deep dive into the protocols and attacks supported by TokenFlow. Click on any card to jump to the corresponding tool.
+            Deep dive into the protocols and attacks supported by Security Tribe Toolkit. Click on any card to jump to the corresponding tool.
         </p>
       </div>
 

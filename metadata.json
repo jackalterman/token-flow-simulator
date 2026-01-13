@@ -1,5 +1,5 @@
 {
-  "name": "Token Flow Simulator",
+  "name": "Security Tribe Toolkit",
   "description": "An interactive educational tool to practice analyzing and understanding security token flows like OAuth2, OIDC, and SAML. Generate tokens, simulate common failures (e.g., invalid signature, expired token), and decode JWTs to inspect their contents.",
   "requestFramePermissions": []
 }
