@@ -34,5 +34,27 @@ export const storageService = {
 
   clearItems(): void {
     localStorage.removeItem(STORAGE_KEY);
+  },
+
+  saveSessionState(key: string, data: any): void {
+    const storageKey = `SecurityTribeToolkit_state_${key}`;
+    localStorage.setItem(storageKey, JSON.stringify(data));
+  },
+
+  getSessionState<T>(key: string): T | null {
+    const storageKey = `SecurityTribeToolkit_state_${key}`;
+    const stored = localStorage.getItem(storageKey);
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      console.error(`Failed to parse stored state for ${key}`, e);
+      return null;
+    }
+  },
+
+  clearSessionState(key: string): void {
+    const storageKey = `SecurityTribeToolkit_state_${key}`;
+    localStorage.removeItem(storageKey);
   }
 };

@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import CodeBlock from './CodeBlock';
 import { jwtService } from '../services/jwtService';
 import { storageService } from '../services/storageService';
-import { SendIcon, KeyIcon, SaveIcon } from './icons';
+import { usePersistentState } from '../hooks/usePersistentState';
+import { SendIcon, KeyIcon, SaveIcon, TrashIcon, RefreshIcon } from './icons';
 import type { DecoderData } from '../types';
 
 interface JwtEncoderProps {
@@ -19,11 +20,11 @@ const defaultPayload = {
 };
 
 const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
-  const [alg, setAlg] = useState('HS256');
-  const [header, setHeader] = useState(JSON.stringify({ alg: 'HS256', typ: 'JWT' }, null, 2));
-  const [payload, setPayload] = useState(JSON.stringify(defaultPayload, null, 2));
-  const [secret, setSecret] = useState('your-256-bit-secret');
-  const [privateKey, setPrivateKey] = useState('');
+  const [alg, setAlg] = usePersistentState('jwt-encoder-alg', 'HS256');
+  const [header, setHeader] = usePersistentState('jwt-encoder-header', JSON.stringify({ alg: 'HS256', typ: 'JWT' }, null, 2));
+  const [payload, setPayload] = usePersistentState('jwt-encoder-payload', JSON.stringify(defaultPayload, null, 2));
+  const [secret, setSecret] = usePersistentState('jwt-encoder-secret', 'your-256-bit-secret');
+  const [privateKey, setPrivateKey] = usePersistentState('jwt-encoder-private-key', '');
   const [publicKey, setPublicKey] = useState('');
   const [generatedToken, setGeneratedToken] = useState('');
   const [error, setError] = useState('');
@@ -103,7 +104,15 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
           
           <div className="grid grid-cols-1 gap-5">
              <div>
-                <label htmlFor="jwt-header" className="block text-sm font-semibold text-slate-700 mb-1">Header JSON</label>
+                <div className="flex justify-between items-baseline mb-1">
+                    <label htmlFor="jwt-header" className="block text-sm font-semibold text-slate-700">Header JSON</label>
+                    <button 
+                        onClick={() => setHeader(JSON.stringify({ alg: alg, typ: 'JWT' }, null, 2))}
+                        className="text-[10px] text-slate-500 hover:text-sky-600 font-bold uppercase tracking-tight flex items-center gap-1"
+                    >
+                        <RefreshIcon className="h-3 w-3" /> Reset
+                    </button>
+                </div>
                 <textarea
                 id="jwt-header"
                 rows={4}
@@ -114,7 +123,15 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
             </div>
 
             <div>
-                <label htmlFor="jwt-payload" className="block text-sm font-semibold text-slate-700 mb-1">Payload JSON</label>
+                <div className="flex justify-between items-baseline mb-1">
+                    <label htmlFor="jwt-payload" className="block text-sm font-semibold text-slate-700">Payload JSON</label>
+                    <button 
+                        onClick={() => setPayload(JSON.stringify(defaultPayload, null, 2))}
+                        className="text-[10px] text-slate-500 hover:text-sky-600 font-bold uppercase tracking-tight flex items-center gap-1"
+                    >
+                        <RefreshIcon className="h-3 w-3" /> Reset
+                    </button>
+                </div>
                 <textarea
                 id="jwt-payload"
                 rows={8}
@@ -188,12 +205,29 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
             )}
           </div>
           
-          <button
-            onClick={handleGenerate}
-            className="w-full inline-flex justify-center py-3 px-4 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
-          >
-            Generate Token
-          </button>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={handleGenerate}
+              className="inline-flex justify-center py-3 px-4 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+            >
+              Generate Token
+            </button>
+            <button
+              onClick={() => {
+                setAlg('HS256');
+                setHeader(JSON.stringify({ alg: 'HS256', typ: 'JWT' }, null, 2));
+                setPayload(JSON.stringify(defaultPayload, null, 2));
+                setSecret('your-256-bit-secret');
+                setPrivateKey('');
+                setGeneratedToken('');
+                setError('');
+              }}
+              className="inline-flex justify-center items-center gap-2 py-3 px-4 border border-slate-300 shadow-sm text-sm font-bold rounded-lg text-slate-600 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+            >
+              <RefreshIcon className="h-4 w-4" />
+              Reset to Defaults
+            </button>
+          </div>
         </div>
       </div>
 

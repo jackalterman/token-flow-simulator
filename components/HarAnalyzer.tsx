@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import { 
   SearchIcon, 
   RefreshIcon, 
@@ -7,6 +8,7 @@ import {
   CheckIcon,
   InfoIcon,
   DownloadIcon,
+  TrashIcon,
   ActivityIcon,
   AlertTriangleIcon,
   SearchIcon as DetailIcon
@@ -19,12 +21,12 @@ interface HarAnalyzerProps {
 
 const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
   const [harData, setHarData] = useState<HarRoot | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = usePersistentState('har-search-query', '');
   const [selectedEntry, setSelectedEntry] = useState<HarEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [activeTypes, setActiveTypes] = useState<string[]>([]);
-  const [activeStatuses, setActiveStatuses] = useState<string[]>([]);
+  const [activeTypes, setActiveTypes] = usePersistentState<string[]>('har-active-types', []);
+  const [activeStatuses, setActiveStatuses] = usePersistentState<string[]>('har-active-statuses', []);
   const [sortField, setSortField] = useState<keyof HarEntry | 'name' | 'size'>('startedDateTime');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -190,6 +192,17 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
+                            <button 
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setActiveTypes([]);
+                                    setActiveStatuses([]);
+                                }}
+                                className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all border border-slate-200 bg-white shadow-sm"
+                                title="Reset Filters"
+                            >
+                                <TrashIcon className="h-5 w-5" />
+                            </button>
                             <button 
                                 onClick={() => {
                                     setHarData(null);

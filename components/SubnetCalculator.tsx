@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { ServerIcon, InfoIcon } from './icons';
+import { usePersistentState } from '../hooks/usePersistentState';
+import { ServerIcon, InfoIcon, TrashIcon, RefreshIcon } from './icons';
 
 interface SubnetResult {
     network: string;
@@ -12,7 +13,7 @@ interface SubnetResult {
 }
 
 const SubnetCalculator: React.FC = () => {
-    const [cidr, setCidr] = useState('192.168.1.0/24');
+    const [cidr, setCidr] = usePersistentState('subnet-cidr', '192.168.1.0/24');
     const [result, setResult] = useState<SubnetResult | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -84,7 +85,15 @@ const SubnetCalculator: React.FC = () => {
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div className="space-y-1">
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">CIDR Notation</h3>
+                            <div className="flex justify-between items-baseline">
+                                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">CIDR Notation</h3>
+                                <button 
+                                    onClick={() => setCidr('192.168.1.0/24')}
+                                    className="text-[10px] text-slate-500 hover:text-sky-600 font-bold uppercase tracking-tight flex items-center gap-1"
+                                >
+                                    <RefreshIcon className="h-3 w-3" /> Reset
+                                </button>
+                            </div>
                             <input
                                 type="text"
                                 value={cidr}

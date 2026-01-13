@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import zxcvbn from 'zxcvbn';
-import { ShieldCheckIcon, AlertTriangleIcon, KeyIcon } from './icons';
+import { ShieldCheckIcon, AlertTriangleIcon, KeyIcon, TrashIcon } from './icons';
 
 const PasswordAnalyzer: React.FC = () => {
-    const [password, setPassword] = useState('');
+    const [password, setPassword] = usePersistentState('password-analyzer-input', '');
     const [analysis, setAnalysis] = useState<any>(null);
 
     useEffect(() => {
@@ -41,7 +42,15 @@ const PasswordAnalyzer: React.FC = () => {
         <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight mb-3">Analyze Password</h3>
+                    <div className="flex justify-between items-baseline mb-3">
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Analyze Password</h3>
+                        <button 
+                            onClick={() => setPassword('')}
+                            className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-tight flex items-center gap-1"
+                        >
+                            <TrashIcon className="h-3 w-3" /> Clear
+                        </button>
+                    </div>
                     <div className="relative">
                         <input
                             type="text"

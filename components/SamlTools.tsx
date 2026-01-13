@@ -1,33 +1,34 @@
 
 import React, { useState } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import CodeBlock from './CodeBlock';
 import { xmlService } from '../services/xmlService';
-import { FileCodeIcon, SendIcon, ShieldCheckIcon, SearchIcon, ClipboardIcon } from './icons';
+import { FileCodeIcon, SendIcon, ShieldCheckIcon, SearchIcon, ClipboardIcon, TrashIcon, RefreshIcon } from './icons';
 
 type SamlMode = 'inspect' | 'generate-response' | 'generate-request' | 'analyze-signature' | 'generate-metadata';
 
 const SamlTools: React.FC = () => {
-    const [mode, setMode] = useState<SamlMode>('inspect');
-    const [rawXml, setRawXml] = useState('');
-    const [prettyXml, setPrettyXml] = useState('');
+    const [mode, setMode] = usePersistentState<SamlMode>('saml-mode', 'inspect');
+    const [rawXml, setRawXml] = usePersistentState('saml-raw-xml', '');
+    const [prettyXml, setPrettyXml] = usePersistentState('saml-pretty-xml', '');
     const [sigAnalysis, setSigAnalysis] = useState<any>(null);
 
     // Response State
-    const [issuer, setIssuer] = useState('https://idp.example.com');
-    const [subject, setSubject] = useState('user@example.com');
-    const [audience, setAudience] = useState('https://sp.example.com');
-    const [acsUrl, setAcsUrl] = useState('https://sp.example.com/acs');
-    const [attrName, setAttrName] = useState('role');
-    const [attrVal, setAttrVal] = useState('admin');
+    const [issuer, setIssuer] = usePersistentState('saml-resp-issuer', 'https://idp.example.com');
+    const [subject, setSubject] = usePersistentState('saml-resp-subject', 'user@example.com');
+    const [audience, setAudience] = usePersistentState('saml-resp-audience', 'https://sp.example.com');
+    const [acsUrl, setAcsUrl] = usePersistentState('saml-resp-acs', 'https://sp.example.com/acs');
+    const [attrName, setAttrName] = usePersistentState('saml-resp-attr-name', 'role');
+    const [attrVal, setAttrVal] = usePersistentState('saml-resp-attr-val', 'admin');
 
     // Request State
-    const [reqIssuer, setReqIssuer] = useState('https://sp.example.com');
-    const [reqAcsUrl, setReqAcsUrl] = useState('https://sp.example.com/acs');
-    const [reqDestination, setReqDestination] = useState('https://idp.example.com/sso');
+    const [reqIssuer, setReqIssuer] = usePersistentState('saml-req-issuer', 'https://sp.example.com');
+    const [reqAcsUrl, setReqAcsUrl] = usePersistentState('saml-req-acs', 'https://sp.example.com/acs');
+    const [reqDestination, setReqDestination] = usePersistentState('saml-req-dest', 'https://idp.example.com/sso');
 
     // Metadata State
-    const [metaEntityId, setMetaEntityId] = useState('https://sp.example.com');
-    const [metaType, setMetaType] = useState<'sp' | 'idp'>('sp');
+    const [metaEntityId, setMetaEntityId] = usePersistentState('saml-meta-entity', 'https://sp.example.com');
+    const [metaType, setMetaType] = usePersistentState<'sp' | 'idp'>('saml-meta-type', 'sp');
 
     const handleInspect = () => {
         try {
@@ -124,7 +125,15 @@ const SamlTools: React.FC = () => {
                 {(mode === 'inspect' || mode === 'analyze-signature') && (
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4 animate-fade-in">
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-1">Raw XML or Base64</label>
+                            <div className="flex justify-between items-baseline mb-1">
+                                <label className="block text-sm font-semibold text-slate-700">Raw XML or Base64</label>
+                                <button 
+                                    onClick={() => { setRawXml(''); setPrettyXml(''); setSigAnalysis(null); }}
+                                    className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-tight flex items-center gap-1"
+                                >
+                                    <TrashIcon className="h-3.5 w-3.5" /> Clear
+                                </button>
+                            </div>
                             <textarea rows={6} className="block w-full rounded-lg border-slate-200 shadow-sm focus:ring-sky-500 text-xs font-mono" placeholder="Paste SAMLResponse or AuthnRequest..." value={rawXml} onChange={(e) => setRawXml(e.target.value)} />
                         </div>
                         {mode === 'inspect' ? (

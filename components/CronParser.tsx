@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import cronstrue from 'cronstrue';
-import { RefreshIcon, InfoIcon, ClockIcon } from './icons';
+import { RefreshIcon, InfoIcon, TrashIcon } from './icons';
 
 // Using the same design pattern but we need ClockIcon. 
 // I'll define a local ClockIcon if it's not in icons.tsx, 
@@ -14,7 +15,7 @@ const ClockIconLocal: React.FC<{className?: string}> = ({ className }) => (
 );
 
 const CronParser: React.FC = () => {
-    const [expression, setExpression] = useState('*/15 * * * *');
+    const [expression, setExpression] = usePersistentState('cron-expression', '*/15 * * * *');
     const [explanation, setExplanation] = useState('');
     const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +48,15 @@ const CronParser: React.FC = () => {
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="flex-1 space-y-2">
-                            <label className="text-sm font-bold text-slate-800 uppercase tracking-tight ml-1">Cron Expression</label>
+                            <div className="flex justify-between items-baseline">
+                                <label className="text-sm font-bold text-slate-800 uppercase tracking-tight ml-1">Cron Expression</label>
+                                <button 
+                                    onClick={() => setExpression('')}
+                                    className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-tight flex items-center gap-1"
+                                >
+                                    <TrashIcon className="h-3 w-3" /> Clear
+                                </button>
+                            </div>
                             <input
                                 type="text"
                                 value={expression}

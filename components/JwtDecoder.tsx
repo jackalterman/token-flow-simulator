@@ -3,8 +3,9 @@ import CodeBlock from './CodeBlock';
 import JsonViewer from './JsonViewer';
 import { jwtService } from '../services/jwtService';
 import { storageService } from '../services/storageService';
-import type { DecodedJwt, VerificationResult, DecoderData } from '../types';
-import { CheckIcon, AlertTriangleIcon, SaveIcon } from './icons';
+import { usePersistentState } from '../hooks/usePersistentState';
+import { DecodedJwt, VerificationResult, DecoderData } from '../types';
+import { CheckIcon, AlertTriangleIcon, SaveIcon, TrashIcon, RefreshIcon } from './icons';
 
 interface JwtDecoderProps {
   initialData: DecoderData | null;
@@ -12,10 +13,10 @@ interface JwtDecoderProps {
 }
 
 const JwtDecoder: React.FC<JwtDecoderProps> = ({ initialData, onDataHandled }) => {
-  const [token, setToken] = useState('');
-  const [key, setKey] = useState('your-256-bit-secret');
-  const [audience, setAudience] = useState('');
-  const [issuer, setIssuer] = useState('');
+  const [token, setToken] = usePersistentState('jwt-decoder-token', '');
+  const [key, setKey] = usePersistentState('jwt-decoder-key', 'your-256-bit-secret');
+  const [audience, setAudience] = usePersistentState('jwt-decoder-audience', '');
+  const [issuer, setIssuer] = usePersistentState('jwt-decoder-issuer', '');
   const [decoded, setDecoded] = useState<DecodedJwt | null>(null);
   const [verification, setVerification] = useState<VerificationResult | null>(null);
   const [showSecret, setShowSecret] = useState(false);
@@ -157,13 +158,30 @@ const JwtDecoder: React.FC<JwtDecoderProps> = ({ initialData, onDataHandled }) =
                     </div>
                 </div>
 
-                <button
-                    onClick={handleVerify}
-                    disabled={!token}
-                    className="w-full inline-flex justify-center py-2.5 px-4 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
-                >
-                    Verify Token
-                </button>
+                <div className="grid grid-cols-2 gap-4">
+                    <button
+                        onClick={handleVerify}
+                        disabled={!token}
+                        className="inline-flex justify-center py-2.5 px-4 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                        Verify Token
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            setToken('');
+                            setDecoded(null);
+                            setKey('your-256-bit-secret');
+                            setAudience('');
+                            setIssuer('');
+                            setVerification(null);
+                        }}
+                        className="inline-flex justify-center items-center gap-2 py-2.5 px-4 border border-slate-300 shadow-sm text-sm font-bold rounded-lg text-slate-600 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+                    >
+                        <RefreshIcon className="h-4 w-4" />
+                        Reset to Defaults
+                    </button>
+                </div>
 
                 {token && (
                     <button

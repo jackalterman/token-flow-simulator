@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { ClipboardIcon, CheckIcon, RefreshIcon, ArrowRightIcon } from './icons';
+import { usePersistentState } from '../hooks/usePersistentState';
+import { ClipboardIcon, CheckIcon, RefreshIcon, ArrowRightIcon, TrashIcon } from './icons';
 
 const UrlTool: React.FC = () => {
-    const [input, setInput] = useState('');
+    const [input, setInput] = usePersistentState('url-input', '');
     const [output, setOutput] = useState('');
-    const [mode, setMode] = useState<'encode' | 'decode'>('encode');
-    const [useComponent, setUseComponent] = useState(true);
+    const [mode, setMode] = usePersistentState<'encode' | 'decode'>('url-mode', 'encode');
+    const [useComponent, setUseComponent] = usePersistentState('url-use-component', true);
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -90,10 +91,10 @@ const UrlTool: React.FC = () => {
                     </div>
                     <button 
                         onClick={() => { setInput(''); setOutput(''); }}
-                        className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="text-rose-400 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold uppercase tracking-tight"
                         title="Clear all"
                     >
-                        <RefreshIcon className="h-5 w-5" />
+                        <TrashIcon className="h-5 w-5" /> Clear
                     </button>
                 </div>
 

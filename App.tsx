@@ -27,10 +27,11 @@ import OidcTools from './components/OidcTools';
 import XswSimulator from './components/XswSimulator';
 import DeviceFlowVisualizer from './components/DeviceFlowVisualizer';
 import LogoutExplorer from './components/LogoutExplorer';
+import { usePersistentState } from './hooks/usePersistentState';
 import type { DecoderData } from './types';
 
 const App: React.FC = () => {
-  const [activeView, setActiveView] = useState<AppView>(AppView.DECODE);
+  const [activeView, setActiveView] = usePersistentState<AppView>('app-active-view', AppView.DECODE);
   const [decoderInitialData, setDecoderInitialData] = useState<DecoderData | null>(null);
 
   const handleSendToDecoder = (data: DecoderData) => {

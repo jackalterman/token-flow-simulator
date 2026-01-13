@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
 import CryptoJS from 'crypto-js';
-import { ClipboardIcon, CheckIcon, RefreshIcon, ShieldCheckIcon } from './icons';
+import { ClipboardIcon, CheckIcon, RefreshIcon, ShieldCheckIcon, TrashIcon } from './icons';
 
 type HmacAlgo = 'MD5' | 'SHA1' | 'SHA256' | 'SHA512';
 
 const HmacTool: React.FC = () => {
-    const [input, setInput] = useState('');
-    const [secret, setSecret] = useState('');
-    const [algo, setAlgo] = useState<HmacAlgo>('SHA256');
+    const [input, setInput] = usePersistentState('hmac-input', '');
+    const [secret, setSecret] = usePersistentState('hmac-secret', '');
+    const [algo, setAlgo] = usePersistentState<HmacAlgo>('hmac-algo', 'SHA256');
     const [output, setOutput] = useState('');
     const [copied, setCopied] = useState(false);
 
@@ -56,10 +57,10 @@ const HmacTool: React.FC = () => {
                     </div>
                     <button 
                         onClick={() => { setInput(''); setSecret(''); setOutput(''); }}
-                        className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="text-rose-400 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold uppercase tracking-tight"
                         title="Clear all"
                     >
-                        <RefreshIcon className="h-5 w-5" />
+                        <TrashIcon className="h-5 w-5" /> Clear
                     </button>
                 </div>
 
