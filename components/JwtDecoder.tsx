@@ -75,7 +75,7 @@ const JwtDecoder: React.FC<JwtDecoderProps> = ({ initialData, onDataHandled }) =
     );
   };
 
-  const isRsa = decoded?.header?.alg === 'RS256';
+  const isAsymmetric = decoded?.header?.alg === 'RS256' || decoded?.header?.alg === 'ES256';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -104,7 +104,7 @@ const JwtDecoder: React.FC<JwtDecoderProps> = ({ initialData, onDataHandled }) =
                 <div>
                     <div className="flex justify-between items-center mb-1">
                         <label htmlFor="jwt-verify-key" className="block text-sm font-medium text-slate-700">
-                            {isRsa ? 'RSA Public Key' : 'HMAC Secret'}
+                            {isAsymmetric ? 'Public Key (PEM)' : 'HMAC Secret'}
                         </label>
                         <button 
                             onClick={() => setShowSecret(!showSecret)}
@@ -113,13 +113,15 @@ const JwtDecoder: React.FC<JwtDecoderProps> = ({ initialData, onDataHandled }) =
                             {showSecret ? 'Hide' : 'Show'}
                         </button>
                     </div>
-                    {isRsa ? (
+                    {isAsymmetric ? (
                         <textarea
                         id="jwt-verify-key"
-                        rows={4}
-                        className={`block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-xs font-mono ${!showSecret ? 'text-slate-400' : ''}`}
+                        className={`block w-full rounded-lg border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-xs font-mono bg-slate-50 ${!showSecret ? 'text-transparent tracking-tighter select-none' : ''}`}
+                        rows={6}
                         value={key}
                         onChange={(e) => setKey(e.target.value)}
+                        placeholder="Paste Public Key (PEM) here."
+                        style={{ textShadow: !showSecret ? '0 0 8px rgba(0,0,0,0.5)' : 'none' }}
                         />
                     ) : (
                         <input
