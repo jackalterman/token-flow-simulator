@@ -20,9 +20,9 @@ interface HarAnalyzerProps {
 }
 
 const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
-  const [harData, setHarData] = useState<HarRoot | null>(null);
+  const [harData, setHarData] = usePersistentState<HarRoot | null>('har-data', null);
   const [searchQuery, setSearchQuery] = usePersistentState('har-search-query', '');
-  const [selectedEntry, setSelectedEntry] = useState<HarEntry | null>(null);
+  const [selectedEntry, setSelectedEntry] = usePersistentState<HarEntry | null>('har-selected-entry', null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeTypes, setActiveTypes] = usePersistentState<string[]>('har-active-types', []);
@@ -115,6 +115,13 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
     if (status >= 300 && status < 400) return 'text-amber-600';
     if (status >= 400) return 'text-rose-600';
     return 'text-slate-600';
+  };
+
+  const getStatusPillStyles = (status: number) => {
+    if (status >= 200 && status < 300) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+    if (status >= 300 && status < 400) return 'bg-amber-100 text-amber-700 border-amber-200';
+    if (status >= 400) return 'bg-rose-100 text-rose-700 border-rose-200';
+    return 'bg-slate-100 text-slate-700 border-slate-200';
   };
 
   const formatSize = (bytes: number) => {
@@ -287,7 +294,7 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                                 </h3>
                                 <div className="flex items-center space-x-3 text-[10px]">
                                     <span className="font-bold px-1.5 py-0.5 bg-slate-200 rounded text-slate-700">{selectedEntry.request.method}</span>
-                                    <span className={`font-bold px-1.5 py-0.5 rounded ${getStatusColor(selectedEntry.response.status)} bg-opacity-10 bg-current`}>
+                                    <span className={`font-bold px-1.5 py-0.5 rounded border ${getStatusPillStyles(selectedEntry.response.status)}`}>
                                         {selectedEntry.response.status} {selectedEntry.response.statusText}
                                     </span>
                                     <span className="text-slate-400">{selectedEntry.startedDateTime}</span>
