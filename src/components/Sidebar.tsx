@@ -68,6 +68,20 @@ interface Category {
 }
 
 const categories: Category[] = [
+    {
+    name: 'Data Tools',
+    items: [
+      { id: AppView.HAR_ANALYZER, label: 'HAR Analyzer', icon: DetailIcon },
+      { id: AppView.BASE64, label: 'Base64 Tool', icon: LockClosedIcon },
+      { id: AppView.URL, label: 'URL Tool', icon: ArrowRightIcon },
+      { id: AppView.HASH, label: 'Hashing Tool', icon: KeyIcon },
+      { id: AppView.HMAC, label: 'HMAC Tool', icon: ShieldCheckIcon },
+      { id: AppView.UUID, label: 'UUID Generator', icon: RefreshIcon },
+      { id: AppView.PASSWORD, label: 'Password Analyzer', icon: ShieldCheckIcon },
+      { id: AppView.CONVERT, label: 'Format Converter', icon: RefreshIcon },
+
+    ],
+  },
   {
     name: 'JWT & OAuth',
     items: [
@@ -93,31 +107,6 @@ const categories: Category[] = [
     ],
   },
   {
-    name: 'Educational',
-    items: [
-      { id: AppView.FLOWS, label: 'Flow Visualizer', icon: ShuffleIcon },
-      { id: AppView.XSW_SIMULATOR, label: 'XSW Simulator', icon: AlertTriangleIcon },
-      { id: AppView.DEVICE_FLOW, label: 'Device Flow', icon: MonitorIcon },
-      { id: AppView.LOGOUT_EXPLORER, label: 'Logout Explorer', icon: LogOutIcon },
-      { id: AppView.SIMULATE, label: 'Failure Simulator', icon: ShieldCheckIcon },
-      { id: AppView.LEARN, label: 'Learn Flows', icon: InfoIcon },
-      { id: AppView.SCOPES, label: 'Scope Explorer', icon: UsersIcon },
-    ],
-  },
-  {
-    name: 'Data Tools',
-    items: [
-      { id: AppView.BASE64, label: 'Base64 Tool', icon: LockClosedIcon },
-      { id: AppView.URL, label: 'URL Tool', icon: ArrowRightIcon },
-      { id: AppView.HASH, label: 'Hashing Tool', icon: KeyIcon },
-      { id: AppView.HMAC, label: 'HMAC Tool', icon: ShieldCheckIcon },
-      { id: AppView.UUID, label: 'UUID Generator', icon: RefreshIcon },
-      { id: AppView.PASSWORD, label: 'Password Analyzer', icon: ShieldCheckIcon },
-      { id: AppView.CONVERT, label: 'Format Converter', icon: RefreshIcon },
-      { id: AppView.HAR_ANALYZER, label: 'HAR Analyzer', icon: DetailIcon },
-    ],
-  },
-  {
     name: 'Infrastructure',
     items: [
       { id: AppView.SUBNET, label: 'Subnet Calc', icon: ServerIcon },
@@ -130,6 +119,18 @@ const categories: Category[] = [
     name: 'Saved',
     items: [
       { id: AppView.COLLECTIONS, label: 'Collections', icon: BookmarkIcon },
+    ],
+  },
+    {
+    name: 'Educational',
+    items: [
+      { id: AppView.FLOWS, label: 'Flow Visualizer', icon: ShuffleIcon },
+      { id: AppView.XSW_SIMULATOR, label: 'XSW Simulator', icon: AlertTriangleIcon },
+      { id: AppView.DEVICE_FLOW, label: 'Device Flow', icon: MonitorIcon },
+      { id: AppView.LOGOUT_EXPLORER, label: 'Logout Explorer', icon: LogOutIcon },
+      { id: AppView.SIMULATE, label: 'Failure Simulator', icon: ShieldCheckIcon },
+      { id: AppView.LEARN, label: 'Learn Flows', icon: InfoIcon },
+      { id: AppView.SCOPES, label: 'Scope Explorer', icon: UsersIcon },
     ],
   },
 ];
