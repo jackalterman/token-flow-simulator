@@ -14,15 +14,24 @@ import {
   SearchIcon as DetailIcon
 } from './icons';
 import { HarRoot, HarEntry, filterEntries, parseHarFile } from '../services/har';
+import { saveHarToDB, getHarFromDB, clearHarFromDB } from '../services/harStorage';
 
 interface HarAnalyzerProps {
   onSendToDecoder?: (data: any) => void;
 }
 
 const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
-  const [harData, setHarData] = usePersistentState<HarRoot | null>('har-data', null);
+  const [harData, setHarData] = useState<HarRoot | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    getHarFromDB()
+      .then(data => setHarData(data))
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  }, []);
   const [searchQuery, setSearchQuery] = usePersistentState('har-search-query', '');
-  const [selectedEntry, setSelectedEntry] = usePersistentState<HarEntry | null>('har-selected-entry', null);
+  const [selectedEntry, setSelectedEntry] = useState<HarEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [activeTypes, setActiveTypes] = usePersistentState<string[]>('har-active-types', []);
@@ -49,20 +58,27 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setIsLoading(true);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
         const parsed = parseHarFile(content);
+        await saveHarToDB(parsed);
         setHarData(parsed);
         setError(null);
         setSelectedEntry(null);
       } catch (err: any) {
         setError(err.message || 'Failed to parse HAR file.');
         setHarData(null);
+      } finally {
+        setIsLoading(false);
       }
     };
-    reader.onerror = () => setError('Error reading file');
+    reader.onerror = () => {
+        setError('Error reading file');
+        setIsLoading(false);
+    }
     reader.readAsText(file);
   };
 
@@ -211,7 +227,8 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                                 <TrashIcon className="h-5 w-5" />
                             </button>
                             <button 
-                                onClick={() => {
+                                onClick={async () => {
+                                    await clearHarFromDB();
                                     setHarData(null);
                                     setSelectedEntry(null);
                                 }}
