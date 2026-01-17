@@ -1,12 +1,46 @@
 
 import React, { useState, useEffect } from 'react';
 import { jwtService } from '../services/jwtService';
-import { ScaleIcon } from './icons';
+import { ScaleIcon, TrashIcon } from './icons';
+import { saveTokenDiffToDB, getTokenDiffFromDB, clearTokenDiffFromDB } from '../services/tokenDiffStorage';
 
 const TokenDiff: React.FC = () => {
   const [tokenA, setTokenA] = useState('');
   const [tokenB, setTokenB] = useState('');
   const [diff, setDiff] = useState<React.ReactNode>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load tokens from IndexedDB on mount
+  useEffect(() => {
+    const loadTokens = async () => {
+      try {
+        const savedState = await getTokenDiffFromDB();
+        if (savedState) {
+          setTokenA(savedState.tokenA || '');
+          setTokenB(savedState.tokenB || '');
+        }
+      } catch (error) {
+        console.error('Error loading tokens from DB:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadTokens();
+  }, []);
+
+  // Save tokens to IndexedDB whenever they change
+  useEffect(() => {
+    if (!isLoading) {
+      const saveTokens = async () => {
+        try {
+          await saveTokenDiffToDB({ tokenA, tokenB });
+        } catch (error) {
+          console.error('Error saving tokens to DB:', error);
+        }
+      };
+      saveTokens();
+    }
+  }, [tokenA, tokenB, isLoading]);
 
   useEffect(() => {
     compareTokens();
@@ -60,11 +94,31 @@ const TokenDiff: React.FC = () => {
     );
   };
 
+  const handleClear = async () => {
+    setTokenA('');
+    setTokenB('');
+    try {
+      await clearTokenDiffFromDB();
+    } catch (error) {
+      console.error('Error clearing tokens from DB:', error);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Token Diff</h2>
-        <p className="text-slate-600">Compare the payloads of two JWTs to identify changes in claims.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Token Diff</h2>
+          <p className="text-slate-600">Compare the payloads of two JWTs to identify changes in claims.</p>
+        </div>
+        <button
+          onClick={handleClear}
+          className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-semibold text-sm"
+          title="Clear both tokens"
+        >
+          <TrashIcon className="h-4 w-4" />
+          Clear
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
