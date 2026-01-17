@@ -20,20 +20,22 @@ export const certificateService = {
   async fetchFromUrl(domain: string): Promise<CertificateInfo[]> {
     const cleanDomain = domain.replace(/^https?:\/\//, '').split('/')[0];
     
-    try {
-      // Using CertSpotter API with expansion for better data
-      const response = await fetch(`https://api.certspotter.com/v1/issuances?domain=${cleanDomain}&include_precertificates=false&expand=dns_names&expand=issuer&expand=cert&limit=5`);
+    // Helper to try fetching for a specific domain candidate
+    const tryFetch = async (candidateDomain: string): Promise<CertificateInfo[]> => {
+      console.log(`Attempting to fetch certificates for: ${candidateDomain}`);
+      const response = await fetch(`https://api.certspotter.com/v1/issuances?domain=${candidateDomain}&include_precertificates=false&expand=dns_names&expand=issuer&expand=cert&limit=5`);
       
       if (!response.ok) {
-        throw new Error(`API responded with status: ${response.status}`);
+        // If it's a 4xx/5xx that isn't 404, we might want to just throw or return empty
+        // For now, treat non-200 as empty results for this candidate
+        return [];
       }
       
       const data = await response.json();
-      
       if (!Array.isArray(data) || data.length === 0) {
-        throw new Error('No certificates found for this domain.');
+        return [];
       }
-      
+
       return data.map((cert: any) => ({
         subject: Array.isArray(cert.dns_names) ? cert.dns_names.join(', ') : (cert.subject?.common_name || 'Unknown Subject'),
         issuer: cert.issuer?.name || 'Unknown Issuer',
@@ -44,9 +46,40 @@ export const certificateService = {
         pem: cert.cert?.pem || `-----BEGIN CERTIFICATE-----\n${cert.pubkey_sha256}\n-----END CERTIFICATE-----`,
         type: (Array.isArray(cert.dns_names) && cert.dns_names.length > 0) ? 'Leaf' : 'Unknown'
       }));
-    } catch (error) {
+    };
+
+    try {
+      // Strategy 1: Try exact match
+      let results = await tryFetch(cleanDomain);
+      if (results.length > 0) return results;
+
+      // Strategy 2: If www., try stripping it
+      if (cleanDomain.startsWith('www.')) {
+        const withoutWww = cleanDomain.substring(4);
+        results = await tryFetch(withoutWww);
+        if (results.length > 0) return results;
+      }
+
+      // Strategy 3: Try parent domain (if at least 2 parts like sub.example.com -> example.com)
+      // This is useful for wildcards attached to the parent
+      const parts = cleanDomain.split('.');
+      if (parts.length > 2) {
+        // e.g. foo.bar.com -> bar.com
+        // But be careful not to strip too much (e.g. co.uk) - naive approach for now is safe enough for common cases
+        const parentDomain = parts.slice(1).join('.');
+        // Avoid re-fetching if we just did it in step 2 (e.g. www.google.com -> google.com)
+        if (parentDomain !== cleanDomain && (!cleanDomain.startsWith('www.') || parentDomain !== cleanDomain.substring(4))) {
+           results = await tryFetch(parentDomain);
+           if (results.length > 0) return results;
+        }
+      }
+
+      throw new Error('No certificates found for this domain (or its parents).');
+
+    } catch (error: any) {
       console.error('Error fetching certificates:', error);
-      throw error;
+      // Propagate the specific error message if it's our own
+      throw error; 
     }
   },
 
