@@ -71,19 +71,13 @@ const categories: Category[] = [
     {
     name: 'Data Tools',
     items: [
-      { id: AppView.HAR_ANALYZER, label: 'HAR Analyzer', icon: DetailIcon },
-      { id: AppView.BASE64, label: 'Base64 Tool', icon: LockClosedIcon },
-      { id: AppView.URL, label: 'URL Tool', icon: ArrowRightIcon },
-      { id: AppView.HASH, label: 'Hashing Tool', icon: KeyIcon },
-      { id: AppView.HMAC, label: 'HMAC Tool', icon: ShieldCheckIcon },
-      { id: AppView.UUID, label: 'UUID Generator', icon: RefreshIcon },
-      { id: AppView.PASSWORD, label: 'Password Analyzer', icon: ShieldCheckIcon },
-      { id: AppView.CONVERT, label: 'Format Converter', icon: RefreshIcon },
-
+      { id: AppView.HAR_ANALYZER, label: 'HAR Analyzer', icon: DetailIcon },      
+      { id: AppView.KEYS, label: 'Key Manager', icon: KeyIcon },
+      { id: AppView.BASE64, label: 'Base64 Converter', icon: LockClosedIcon },      
     ],
   },
   {
-    name: 'JWT & OAuth',
+    name: 'JWT & OAuth Tools',
     items: [
       { id: AppView.DECODE, label: 'JWT Decoder', icon: SearchIcon },
       { id: AppView.ENCODE, label: 'JWT Encoder', icon: FileCodeIcon },
@@ -92,13 +86,13 @@ const categories: Category[] = [
     ],
   },
   {
-    name: 'Auth Protocols',
+    name: 'SAML Tools',
     items: [
       { id: AppView.SAML, label: 'SAML Tools', icon: CertificateIcon },
     ],
   },
   {
-    name: 'OIDC',
+    name: 'OIDC Tools',
     items: [
       { id: AppView.OIDC_DISCOVERY, label: 'Discovery Explorer', icon: SearchIcon },
       { id: AppView.OIDC_USERINFO, label: 'UserInfo Fetcher', icon: UsersIcon },
@@ -107,18 +101,17 @@ const categories: Category[] = [
     ],
   },
   {
-    name: 'Infrastructure',
+    name: 'IT Tools',
     items: [
       { id: AppView.SUBNET, label: 'Subnet Calc', icon: ServerIcon },
       { id: AppView.CRON, label: 'Cron Parser', icon: RefreshIcon },
-      { id: AppView.KEYS, label: 'Key Manager', icon: KeyIcon },
       { id: AppView.SECRETS, label: 'Secret Generator', icon: LockClosedIcon },
-    ],
-  },
-  {
-    name: 'Saved',
-    items: [
-      { id: AppView.COLLECTIONS, label: 'Collections', icon: BookmarkIcon },
+      { id: AppView.URL, label: 'URL Tool', icon: ArrowRightIcon },
+      { id: AppView.HASH, label: 'Hashing Tool', icon: KeyIcon },
+      { id: AppView.HMAC, label: 'HMAC Tool', icon: ShieldCheckIcon },
+      { id: AppView.UUID, label: 'UUID Generator', icon: RefreshIcon },
+      { id: AppView.PASSWORD, label: 'Password Analyzer', icon: ShieldCheckIcon },
+      { id: AppView.CONVERT, label: 'Format Converter', icon: RefreshIcon },
     ],
   },
     {
@@ -131,6 +124,12 @@ const categories: Category[] = [
       { id: AppView.SIMULATE, label: 'Failure Simulator', icon: ShieldCheckIcon },
       { id: AppView.LEARN, label: 'Learn Flows', icon: InfoIcon },
       { id: AppView.SCOPES, label: 'Scope Explorer', icon: UsersIcon },
+    ],
+  },
+    {
+    name: 'Saved',
+    items: [
+      { id: AppView.COLLECTIONS, label: 'Collections', icon: BookmarkIcon },
     ],
   },
 ];
