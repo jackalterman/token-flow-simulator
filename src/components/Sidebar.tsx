@@ -180,11 +180,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
         ))}
       </nav>
       
-      <div className="p-4 border-t border-slate-100 bg-slate-50">
-        <p className="text-[10px] text-slate-400 text-center font-medium">
-          v2.0.0 • Client-side only
-        </p>
-      </div>
+
     </div>
   );
 };

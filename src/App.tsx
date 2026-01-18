@@ -124,14 +124,7 @@ const App: React.FC = () => {
       <Sidebar activeView={activeView} setActiveView={setActiveView} />
       
       <main className="flex-1 overflow-y-auto">
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10 px-8 py-4">
-          <div className="flex items-center justify-between max-w-5xl mx-auto">
-            <h2 className="text-xl font-bold text-slate-800">{activeView}</h2>
-            <div className="text-sm text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full">
-              Browser-only session
-            </div>
-          </div>
-        </header>
+
 
         <div className="p-8 max-w-5xl mx-auto animate-fade-in">
           {renderView()}
