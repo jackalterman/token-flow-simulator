@@ -1,12 +1,21 @@
-
 import React, { useState, useEffect } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
 import zxcvbn from 'zxcvbn';
-import { ShieldCheckIcon, AlertTriangleIcon, KeyIcon, TrashIcon } from './icons';
+import { ShieldCheckIcon, AlertTriangleIcon, KeyIcon, TrashIcon, RefreshIcon, CheckCircleIcon } from './icons';
 
 const PasswordAnalyzer: React.FC = () => {
     const [password, setPassword] = usePersistentState('password-analyzer-input', '');
     const [analysis, setAnalysis] = useState<any>(null);
+
+    // Generator State
+    const [showGenerator, setShowGenerator] = useState(false);
+    const [genLength, setGenLength] = useState(16);
+    const [genOptions, setGenOptions] = useState({
+        upper: true,
+        lower: true,
+        numbers: true,
+        symbols: true
+    });
 
     useEffect(() => {
         if (!password) {
@@ -15,6 +24,34 @@ const PasswordAnalyzer: React.FC = () => {
         }
         setAnalysis(zxcvbn(password));
     }, [password]);
+
+    const generatePassword = () => {
+        const charset = {
+            upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+            lower: "abcdefghijklmnopqrstuvwxyz",
+            numbers: "0123456789",
+            symbols: "!@#$%^&*()_+~`|}{[]:;?><,./-="
+        };
+
+        let chars = "";
+        if (genOptions.upper) chars += charset.upper;
+        if (genOptions.lower) chars += charset.lower;
+        if (genOptions.numbers) chars += charset.numbers;
+        if (genOptions.symbols) chars += charset.symbols;
+
+        if (chars === "") return; // Safety check
+
+        const array = new Uint32Array(genLength);
+        crypto.getRandomValues(array);
+        
+        let result = "";
+        for (let i = 0; i < genLength; i++) {
+            result += chars[array[i] % chars.length];
+        }
+
+        setPassword(result);
+        setShowGenerator(false);
+    };
 
     const getStrengthColor = (score: number) => {
         switch (score) {
@@ -44,13 +81,65 @@ const PasswordAnalyzer: React.FC = () => {
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50">
                     <div className="flex justify-between items-baseline mb-3">
                         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Analyze Password</h3>
-                        <button 
-                            onClick={() => setPassword('')}
-                            className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-tight flex items-center gap-1"
-                        >
-                            <TrashIcon className="h-3 w-3" /> Clear
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => setShowGenerator(!showGenerator)}
+                                className={`text-[10px] font-bold uppercase tracking-tight flex items-center gap-1 transition-colors ${showGenerator ? 'text-sky-600' : 'text-slate-500 hover:text-sky-600'}`}
+                            >
+                                <RefreshIcon className="h-3 w-3" /> Generator
+                            </button>
+                            <button 
+                                onClick={() => setPassword('')}
+                                className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-tight flex items-center gap-1"
+                            >
+                                <TrashIcon className="h-3 w-3" /> Clear
+                            </button>
+                        </div>
                     </div>
+
+                    {showGenerator && (
+                        <div className="mb-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm animate-fade-in-down">
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Length: {genLength}</label>
+                                    </div>
+                                    <input 
+                                        type="range" 
+                                        min="8" 
+                                        max="64" 
+                                        value={genLength} 
+                                        onChange={(e) => setGenLength(parseInt(e.target.value))}
+                                        className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                                    />
+                                </div>
+                                <div className="flex flex-wrap gap-4">
+                                    {(['upper', 'lower', 'numbers', 'symbols'] as const).map((opt) => (
+                                        <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+                                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${genOptions[opt] ? 'bg-sky-500 border-sky-500' : 'bg-white border-slate-300 group-hover:border-sky-400'}`}>
+                                                {genOptions[opt] && <CheckCircleIcon className="h-3 w-3 text-white" />}
+                                            </div>
+                                            <input 
+                                                type="checkbox" 
+                                                className="hidden"
+                                                checked={genOptions[opt]}
+                                                onChange={() => setGenOptions(prev => ({...prev, [opt]: !prev[opt]}))}
+                                            />
+                                            <span className="text-xs font-medium text-slate-600 capitalize">{opt}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <button 
+                                    onClick={generatePassword}
+                                    disabled={!Object.values(genOptions).some(Boolean)}
+                                    className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Generate & Use Password
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="relative">
                         <input
                             type="text"
