@@ -126,7 +126,7 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-y-auto">
 
 
-        <div className="p-8 max-w-5xl mx-auto animate-fade-in">
+        <div className="p-8 max-w-[1920px] mx-auto animate-fade-in">
           {renderView()}
           
           <footer className="mt-16 pt-8 border-t border-slate-200 text-center text-slate-400 text-sm pb-12">

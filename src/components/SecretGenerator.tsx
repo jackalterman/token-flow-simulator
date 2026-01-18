@@ -36,7 +36,7 @@ const SecretGenerator: React.FC = () => {
   }, [length, type]);
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full">
          <div className="mb-6">
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Secret Generator</h2>
             <p className="text-slate-600">Generate cryptographically secure random strings for API Keys, Client Secrets, or Salts.</p>
