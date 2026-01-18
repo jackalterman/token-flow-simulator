@@ -1,17 +1,19 @@
-
 import React, { useState } from 'react';
 import { usePersistentState } from '../hooks/usePersistentState';
+import Tabs from './Tabs';
 import CodeBlock from './CodeBlock';
 import { xmlService } from '../services/xmlService';
-import { FileCodeIcon, SendIcon, ShieldCheckIcon, SearchIcon, ClipboardIcon, TrashIcon, RefreshIcon } from './icons';
+import { storageService } from '../services/storageService';
+import { FileCodeIcon, SendIcon, ShieldCheckIcon, SearchIcon, ClipboardIcon, TrashIcon, RefreshIcon, CheckIcon, BookIcon } from './icons';
 
-type SamlMode = 'inspect' | 'generate-response' | 'generate-request' | 'analyze-signature' | 'generate-metadata';
+type SamlView = 'Inspector' | 'Response Gen' | 'Request Gen' | 'Metadata' | 'Sig Analyzer';
 
 const SamlTools: React.FC = () => {
-    const [mode, setMode] = usePersistentState<SamlMode>('saml-mode', 'inspect');
+    const [activeView, setActiveView] = usePersistentState<SamlView>('saml-active-view', 'Inspector');
     const [rawXml, setRawXml] = usePersistentState('saml-raw-xml', '');
     const [prettyXml, setPrettyXml] = usePersistentState('saml-pretty-xml', '');
     const [sigAnalysis, setSigAnalysis] = useState<any>(null);
+    const [copySuccess, setCopySuccess] = useState(false);
 
     // Response State
     const [issuer, setIssuer] = usePersistentState('saml-resp-issuer', 'https://idp.example.com');
@@ -33,9 +35,20 @@ const SamlTools: React.FC = () => {
     const handleInspect = () => {
         try {
             let xml = rawXml.trim();
+            // Auto-detect base64
             if (!xml.startsWith('<') && xml.length > 20) {
-                try { xml = atob(xml); } catch (e) { }
+                try {
+                    const decoded = atob(xml);
+                    if (decoded.trim().startsWith('<')) {
+                        xml = decoded;
+                    }
+                } catch (e) { }
             }
+            // Auto-detect URL decoding
+            if (xml.includes('%3C')) {
+                 try { xml = decodeURIComponent(xml); } catch(e) {}
+            }
+
             setPrettyXml(xmlService.formatXml(xml));
         } catch (e) {
             setPrettyXml('Invalid XML or Base64 Input');
@@ -79,7 +92,6 @@ const SamlTools: React.FC = () => {
         });
         setRawXml(xml);
         setPrettyXml(xmlService.formatXml(xml));
-        setMode('inspect');
     };
 
     const handleGenerateRequest = () => {
@@ -88,7 +100,6 @@ const SamlTools: React.FC = () => {
         });
         setRawXml(xml);
         setPrettyXml(xmlService.formatXml(xml));
-        setMode('inspect');
     };
 
     const handleGenerateMetadata = () => {
@@ -99,154 +110,269 @@ const SamlTools: React.FC = () => {
         });
         setRawXml(xml);
         setPrettyXml(xmlService.formatXml(xml));
-        setMode('inspect');
     };
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(prettyXml);
+    const sendToBase64 = () => {
+        storageService.saveSessionState('base64-input', rawXml);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+    };
+
+    const loadExample = (type: 'google' | 'okta' | 'auth0') => {
+        if (type === 'google') {
+            setIssuer('https://accounts.google.com/o/saml2?idpid=C01234567');
+            setSubject('alice.doe@example.com');
+            setAudience('google.com/a/example.com');
+        } else if (type === 'okta') {
+            setIssuer('http://www.okta.com/exk1234567890abcdef');
+            setSubject('bob.smith@okta.example.com');
+            setAudience('https://sp.example.com/sso/saml');
+        }
     };
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 space-y-6">
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">SAML Tools</h2>
-                    <p className="text-slate-600 italic text-sm">"The protocol that never dies." Decode assertions or generate mock requests and responses.</p>
+                    <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <ShieldCheckIcon className="h-8 w-8 text-sky-600" />
+                        SAML Tools
+                    </h2>
+                    <p className="text-slate-600">Inspect, decode, and generate SAML Assertions, Requests, and Metadata.</p>
                 </div>
-
-                <div className="grid grid-cols-2 gap-1 bg-white p-1 rounded-xl shadow-sm border border-slate-200">
-                    <button onClick={() => setMode('inspect')} className={`py-2 px-2 rounded-lg text-xs font-bold transition-all ${mode === 'inspect' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Inspector</button>
-                    <button onClick={() => setMode('analyze-signature')} className={`py-2 px-2 rounded-lg text-xs font-bold transition-all ${mode === 'analyze-signature' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Sig Analyzer</button>
-                    <button onClick={() => setMode('generate-response')} className={`py-2 px-2 rounded-lg text-xs font-bold transition-all ${mode === 'generate-response' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Response</button>
-                    <button onClick={() => setMode('generate-request')} className={`py-2 px-2 rounded-lg text-xs font-bold transition-all ${mode === 'generate-request' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Request</button>
-                    <button onClick={() => setMode('generate-metadata')} className={`py-2 px-2 rounded-lg text-xs font-bold transition-all ${mode === 'generate-metadata' ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Metadata</button>
-                </div>
-
-                {(mode === 'inspect' || mode === 'analyze-signature') && (
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4 animate-fade-in">
-                        <div>
-                            <div className="flex justify-between items-baseline mb-1">
-                                <label className="block text-sm font-semibold text-slate-700">Raw XML or Base64</label>
-                                <button 
-                                    onClick={() => { setRawXml(''); setPrettyXml(''); setSigAnalysis(null); }}
-                                    className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-tight flex items-center gap-1"
-                                >
-                                    <TrashIcon className="h-3.5 w-3.5" /> Clear
-                                </button>
-                            </div>
-                            <textarea rows={6} className="block w-full rounded-lg border-slate-200 shadow-sm focus:ring-sky-500 text-xs font-mono" placeholder="Paste SAMLResponse or AuthnRequest..." value={rawXml} onChange={(e) => setRawXml(e.target.value)} />
-                        </div>
-                        {mode === 'inspect' ? (
-                            <button onClick={handleInspect} className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-white bg-slate-800 hover:bg-slate-900 font-bold text-sm transition-colors">
-                                <SendIcon className="h-4 w-4" /> Decode & Format
-                            </button>
-                        ) : (
-                            <button onClick={handleAnalyzeSignature} className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-white bg-slate-800 hover:bg-slate-900 font-bold text-sm transition-colors">
-                                <SearchIcon className="h-4 w-4" /> Analyze Signature
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {mode === 'generate-response' && (
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4 animate-fade-in">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Issuer (IdP)</label>
-                            <input type="text" value={issuer} onChange={e => setIssuer(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Subject (User)</label>
-                            <input type="text" value={subject} onChange={e => setSubject(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
-                        </div>
-                        <div>
-                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Audience (SP)</label>
-                             <input type="text" value={audience} onChange={e => setAudience(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
-                        </div>
-                        <button onClick={handleGenerateResponse} className="w-full py-2.5 rounded-lg text-white bg-sky-600 hover:bg-sky-700 font-bold text-sm transition-colors">Generate Response</button>
-                    </div>
-                )}
-
-                {mode === 'generate-request' && (
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4 animate-fade-in">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Issuer (SP)</label>
-                            <input type="text" value={reqIssuer} onChange={e => setReqIssuer(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Destination (IdP)</label>
-                            <input type="text" value={reqDestination} onChange={e => setReqDestination(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
-                        </div>
-                        <button onClick={handleGenerateRequest} className="w-full py-2.5 rounded-lg text-white bg-sky-600 hover:bg-sky-700 font-bold text-sm transition-colors">Generate Request</button>
-                    </div>
-                )}
-
-                {mode === 'generate-metadata' && (
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4 animate-fade-in">
-                         <div className="flex bg-slate-100 p-1 rounded-lg">
-                            <button onClick={() => setMetaType('sp')} className={`flex-1 py-1 px-2 rounded text-xs font-bold ${metaType === 'sp' ? 'bg-white shadow-sm text-sky-600' : 'text-slate-500'}`}>SP Metadata</button>
-                            <button onClick={() => setMetaType('idp')} className={`flex-1 py-1 px-2 rounded text-xs font-bold ${metaType === 'idp' ? 'bg-white shadow-sm text-sky-600' : 'text-slate-500'}`}>IdP Metadata</button>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Entity ID</label>
-                            <input type="text" value={metaEntityId} onChange={e => setMetaEntityId(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
-                        </div>
-                        <button onClick={handleGenerateMetadata} className="w-full py-2.5 rounded-lg text-white bg-sky-600 hover:bg-sky-700 font-bold text-sm transition-colors">Generate Metadata</button>
-                    </div>
-                )}
             </div>
 
-            <div className="lg:col-span-2">
-                <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden min-h-[600px] flex flex-col relative group">
-                    <div className="bg-slate-800 px-4 py-3 border-b border-slate-700 flex justify-between items-center">
-                        <span className="text-[10px] font-mono font-black text-slate-500 tracking-tighter uppercase">XML Serialization</span>
-                        <div className="flex items-center space-x-2">
-                            <button onClick={copyToClipboard} className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-white" title="Copy to clipboard">
-                                <ClipboardIcon className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
-                    <div className="p-4 flex-1 overflow-auto bg-[rgba(15,23,42,0.5)]">
-                        {mode === 'analyze-signature' && sigAnalysis ? (
-                            <div className="space-y-4 animate-fade-in">
-                                {sigAnalysis.error ? (
-                                    <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 text-xs font-mono">
-                                        {sigAnalysis.error}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Column: Controls */}
+                <div className="lg:col-span-1 space-y-6">
+                    <Tabs 
+                        views={['Inspector', 'Response Gen', 'Request Gen', 'Metadata', 'Sig Analyzer']} 
+                        activeView={activeView} 
+                        setActiveView={setActiveView} 
+                    />
+
+                    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 animate-fade-in">
+                        {activeView === 'Inspector' && (
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Input (XML / Base64)</label>
+                                        <button 
+                                            onClick={() => { setRawXml(''); setPrettyXml(''); setSigAnalysis(null); }}
+                                            className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-tight flex items-center gap-1"
+                                        >
+                                            <TrashIcon className="h-3.5 w-3.5" /> Clear
+                                        </button>
                                     </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                                            <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-2">Canonicalization Method</h4>
-                                            <p className="text-cyan-300 font-mono text-xs">{sigAnalysis.canonicalization}</p>
-                                        </div>
-                                        <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                                            <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-2">Signature Method</h4>
-                                            <p className="text-cyan-300 font-mono text-xs">{sigAnalysis.signatureMethod}</p>
-                                        </div>
-                                        <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                                            <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-2">Digest Method</h4>
-                                            <p className="text-cyan-300 font-mono text-xs">{sigAnalysis.digestMethod}</p>
-                                        </div>
-                                        <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                                            <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-2">KeyInfo Present</h4>
-                                            <p className={`font-mono text-xs ${sigAnalysis.keyInfo ? 'text-green-400' : 'text-red-400'}`}>{sigAnalysis.keyInfo ? 'YES' : 'NO'}</p>
-                                        </div>
+                                    <textarea 
+                                        rows={8} 
+                                        className="block w-full rounded-lg border-slate-200 shadow-sm focus:ring-sky-500 text-xs font-mono" 
+                                        placeholder="Paste SAMLResponse, AuthnRequest, or Base64 string..." 
+                                        value={rawXml} 
+                                        onChange={(e) => setRawXml(e.target.value)} 
+                                    />
+                                    <div className="flex gap-2">
+                                        <button onClick={handleInspect} className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-white bg-slate-800 hover:bg-slate-900 font-bold text-sm transition-colors">
+                                            <SearchIcon className="h-4 w-4" /> Decode
+                                        </button>
+                                        <button 
+                                            onClick={sendToBase64} 
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 font-bold text-xs transition-colors border border-slate-200"
+                                            title="Send content to Base64 Tool"
+                                        >
+                                            {copySuccess ? <CheckIcon className="h-4 w-4 text-green-600" /> : <SendIcon className="h-4 w-4" />}
+                                            {copySuccess ? 'Sent!' : 'To Base64'}
+                                        </button>
                                     </div>
-                                )}
+                                </div>
+                                <div className="bg-sky-50 p-4 rounded-lg border border-sky-100 text-xs text-sky-800 space-y-2">
+                                    <h4 className="font-bold flex items-center gap-1"><BookIcon className="h-3 w-3" /> Quick Tip</h4>
+                                    <p>The inspector automatically detects Base64 encoded SAML (often found in HTTP POST binding) and URL-encoded XML (HTTP Redirect binding).</p>
+                                </div>
                             </div>
-                        ) : prettyXml ? (
-                            <pre className="text-xs sm:text-sm font-mono text-cyan-300 leading-relaxed whitespace-pre-wrap break-all selection:bg-sky-500/30">
-                                {prettyXml}
-                            </pre>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-700">
-                                <FileCodeIcon className="h-16 w-16 mb-4 opacity-10" />
-                                <p className="text-sm font-medium">Wait for output...</p>
+                        )}
+
+                        {activeView === 'Response Gen' && (
+                            <div className="space-y-4">
+                                <div className="flex gap-2 mb-4">
+                                    <button onClick={() => loadExample('google')} className="text-xs py-1 px-2 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 font-medium">Load Google Ex.</button>
+                                    <button onClick={() => loadExample('okta')} className="text-xs py-1 px-2 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 font-medium">Load Okta Ex.</button>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Issuer (IdP EntityID)</label>
+                                    <input type="text" value={issuer} onChange={e => setIssuer(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Subject (NameID)</label>
+                                    <input type="text" value={subject} onChange={e => setSubject(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
+                                </div>
+                                <div>
+                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Audience (SP EntityID)</label>
+                                     <input type="text" value={audience} onChange={e => setAudience(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
+                                </div>
+                                <div className="pt-2">
+                                    <button onClick={handleGenerateResponse} className="w-full py-2.5 rounded-lg text-white bg-sky-600 hover:bg-sky-700 font-bold text-sm transition-colors">Generate Mock Response</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeView === 'Request Gen' && (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Issuer (SP EntityID)</label>
+                                    <input type="text" value={reqIssuer} onChange={e => setReqIssuer(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Destination (IdP SSO URL)</label>
+                                    <input type="text" value={reqDestination} onChange={e => setReqDestination(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">ACS URL</label>
+                                    <input type="text" value={reqAcsUrl} onChange={e => setReqAcsUrl(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
+                                </div>
+                                <button onClick={handleGenerateRequest} className="w-full py-2.5 rounded-lg text-white bg-sky-600 hover:bg-sky-700 font-bold text-sm transition-colors">Generate Mock Request</button>
+                            </div>
+                        )}
+
+                        {activeView === 'Metadata' && (
+                            <div className="space-y-4">
+                                 <div className="flex bg-slate-100 p-1 rounded-lg">
+                                    <button onClick={() => setMetaType('sp')} className={`flex-1 py-1 px-2 rounded text-xs font-bold transition-all ${metaType === 'sp' ? 'bg-white shadow-sm text-sky-600' : 'text-slate-500'}`}>SP Metadata</button>
+                                    <button onClick={() => setMetaType('idp')} className={`flex-1 py-1 px-2 rounded text-xs font-bold transition-all ${metaType === 'idp' ? 'bg-white shadow-sm text-sky-600' : 'text-slate-500'}`}>IdP Metadata</button>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Entity ID</label>
+                                    <input type="text" value={metaEntityId} onChange={e => setMetaEntityId(e.target.value)} className="block w-full rounded-md border-slate-200 text-sm" />
+                                </div>
+                                <div className="text-xs text-slate-500 p-2 bg-slate-50 rounded">
+                                    Generates standard XML metadata for setting up trust between IdP and SP.
+                                </div>
+                                <button onClick={handleGenerateMetadata} className="w-full py-2.5 rounded-lg text-white bg-sky-600 hover:bg-sky-700 font-bold text-sm transition-colors">Generate Metadata</button>
+                            </div>
+                        )}
+
+                        {activeView === 'Sig Analyzer' && (
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                     <div className="flex justify-between items-center">
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Input (XML / Base64)</label>
+                                        <button 
+                                            onClick={() => { setRawXml(''); setSigAnalysis(null); }}
+                                            className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-tight flex items-center gap-1"
+                                        >
+                                            <TrashIcon className="h-3.5 w-3.5" /> Clear
+                                        </button>
+                                    </div>
+                                    <textarea 
+                                        rows={8} 
+                                        className="block w-full rounded-lg border-slate-200 shadow-sm focus:ring-sky-500 text-xs font-mono" 
+                                        placeholder="Paste signed SAML XML..." 
+                                        value={rawXml} 
+                                        onChange={(e) => setRawXml(e.target.value)} 
+                                    />
+                                    <button onClick={handleAnalyzeSignature} className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-white bg-slate-800 hover:bg-slate-900 font-bold text-sm transition-colors">
+                                        <ShieldCheckIcon className="h-4 w-4" /> Analyze Signature
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
-                    {prettyXml && <div className="absolute top-12 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="px-3 py-1 bg-sky-500 text-white text-[10px] font-bold rounded-full shadow-lg">READ ONLY</div>
-                    </div>}
+
+                    {/* Educational Content Section - Context Aware */}
+                    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 animate-fade-in">
+                        <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <BookIcon className="h-4 w-4 text-sky-500" />
+                            {activeView === 'Inspector' ? 'About SAML Content' : 
+                             activeView.includes('Gen') ? 'SAML Fields Explained' : 
+                             activeView === 'Metadata' ? 'About Metadata' : 'SAML Signatures'}
+                        </h3>
+                        <div className="text-xs text-slate-600 space-y-2 leading-relaxed">
+                            {activeView === 'Inspector' && (
+                                <>
+                                    <p><strong>SAMLResponse:</strong> The XML token sent from the IdP to the SP containing user identity (Subject) and attributes.</p>
+                                    <p><strong>AuthnRequest:</strong> The request sent from SP to IdP to initiate login.</p>
+                                    <p>These are often Base64 encoded and passed via <code>SAMLRequest</code> or <code>SAMLResponse</code> form parameters.</p>
+                                </>
+                            )}
+                            {(activeView === 'Response Gen' || activeView === 'Request Gen') && (
+                                <>
+                                    <p><strong>Issuer:</strong> The unique EntityID of the system sending the message.</p>
+                                    <p><strong>Subject (NameID):</strong> The username or email identifying the authenticated user.</p>
+                                    <p><strong>Audience:</strong> The EntityID of the intended recipient (SP).</p>
+                                    <p><strong>Destination:</strong> The specific URL where the message is being sent.</p>
+                                </>
+                            )}
+                             {activeView === 'Metadata' && (
+                                <>
+                                    <p><strong>Metadata:</strong> XML document used to exchange configuration between IdP and SP. Contains certificates, URLs (ACS, SSO), and EntityIDs.</p>
+                                    <p>Exchanging metadata is usually the first step in setting up a SAML connection.</p>
+                                </>
+                            )}
+                             {activeView === 'Sig Analyzer' && (
+                                <>
+                                    <p>SAML relies on <strong>XML Digital Signatures (XML-DSig)</strong> to ensure integrity.</p>
+                                    <p>Signatures can be applied to the entire <code>Response</code>, the <code>Assertion</code>, or both.</p>
+                                    <p>Common transformations (Canonicalization) are needed to ensure the XML matches exactly what was signed.</p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Column: Output */}
+                <div className="lg:col-span-2">
+                    <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden min-h-[600px] flex flex-col relative group">
+                        <div className="bg-slate-800 px-4 py-3 border-b border-slate-700 flex justify-between items-center">
+                            <span className="text-[10px] font-mono font-black text-slate-500 tracking-tighter uppercase">XML Output</span>
+                            {/* Actions if needed */}
+                        </div>
+                        <div className="p-0 flex-1 overflow-auto bg-[rgba(15,23,42,0.5)]">
+                            {activeView === 'Sig Analyzer' && sigAnalysis ? (
+                                <div className="p-4 space-y-4 animate-fade-in">
+                                    {sigAnalysis.error ? (
+                                        <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 text-xs font-mono">
+                                            {sigAnalysis.error}
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                                <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-2">Canonicalization</h4>
+                                                <p className="text-cyan-300 font-mono text-xs">{sigAnalysis.canonicalization}</p>
+                                            </div>
+                                            <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                                <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-2">Signature Method</h4>
+                                                <p className="text-cyan-300 font-mono text-xs">{sigAnalysis.signatureMethod}</p>
+                                            </div>
+                                            <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                                <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-2">Digest Method</h4>
+                                                <p className="text-cyan-300 font-mono text-xs">{sigAnalysis.digestMethod}</p>
+                                            </div>
+                                            <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                                <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-2">KeyInfo</h4>
+                                                <p className={`font-mono text-xs ${sigAnalysis.keyInfo ? 'text-green-400' : 'text-red-400'}`}>{sigAnalysis.keyInfo ? 'Present' : 'Missing'}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                     {prettyXml && (
+                                        <div className="mt-4">
+                                              <p className="text-[10px] uppercase font-bold text-slate-500 mb-2 pl-1">Document Context</p>
+                                             <CodeBlock content={prettyXml} language="xml" />
+                                        </div>
+                                    )}
+                                </div>
+                            ) : prettyXml ? (
+                                <div className="p-0">
+                                    <CodeBlock content={prettyXml} language="xml" />
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-700 p-8">
+                                    <FileCodeIcon className="h-16 w-16 mb-4 opacity-10" />
+                                    <p className="text-sm font-medium">Generated or decoded XML will appear here.</p>
+                                    <p className="text-xs text-slate-600 mt-2 text-center max-w-xs">Use the tools on the left to inspect existing SAML messages or generate new ones for testing.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

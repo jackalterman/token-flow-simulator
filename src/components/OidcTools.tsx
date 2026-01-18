@@ -27,6 +27,8 @@ const OidcTools: React.FC<OidcToolsProps> = ({ activeSubView }) => {
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
+    const [showRawJson, setShowRawJson] = useState(false);
+
     // Discovery State
     const [issuer, setIssuer] = useState('');
     const [config, setConfig] = useState<any>(null);
@@ -333,8 +335,8 @@ const OidcTools: React.FC<OidcToolsProps> = ({ activeSubView }) => {
                                 </div>
                             </div>
 
-                            {config && (
-                                <div className="space-y-3">
+                        {config && (
+                                <div className="space-y-6">
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-sm font-bold text-slate-700">Discovery Document</h4>
                                         <button 
@@ -346,7 +348,7 @@ const OidcTools: React.FC<OidcToolsProps> = ({ activeSubView }) => {
                                         </button>
                                     </div>
                                     
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {[
                                             { key: 'issuer', label: 'Issuer', icon: '🏢' },
                                             { key: 'authorization_endpoint', label: 'Authorization', icon: '🔐' },
@@ -355,14 +357,62 @@ const OidcTools: React.FC<OidcToolsProps> = ({ activeSubView }) => {
                                             { key: 'jwks_uri', label: 'JWKS', icon: '🔑' },
                                             { key: 'end_session_endpoint', label: 'Logout', icon: '🚪' }
                                         ].map(({ key, label, icon }) => config[key] && (
-                                            <div key={key} className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                                                <div className="text-xs font-bold text-slate-500 mb-1">{icon} {label}</div>
-                                                <div className="text-xs font-mono text-slate-700 break-all">{config[key]}</div>
+                                            <div key={key} className="bg-slate-50 rounded-lg p-3 border border-slate-200 shadow-sm">
+                                                <div className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1.5">
+                                                    <span>{icon}</span> {label}
+                                                </div>
+                                                <div className="text-xs font-mono text-slate-700 break-all bg-white p-1.5 rounded border border-slate-100 select-all">
+                                                    {config[key]}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
 
-                                    <CodeBlock code={JSON.stringify(config, null, 2)} language="json" />
+                                    {/* Supported Features Lists */}
+                                    <div className="space-y-4">
+                                        {[
+                                            { key: 'scopes_supported', label: 'Supported Scopes', color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+                                            { key: 'response_types_supported', label: 'Response Types', color: 'bg-indigo-50 text-indigo-700 border-indigo-100' },
+                                            { key: 'response_modes_supported', label: 'Response Modes', color: 'bg-indigo-50 text-indigo-700 border-indigo-100' },
+                                            { key: 'grant_types_supported', label: 'Grant Types', color: 'bg-violet-50 text-violet-700 border-violet-100' },
+                                            { key: 'token_endpoint_auth_methods_supported', label: 'Token Endpoint Auth Methods', color: 'bg-pink-50 text-pink-700 border-pink-100' },
+                                            { key: 'code_challenge_methods_supported', label: 'PKCE Methods', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100' },
+                                            { key: 'claims_supported', label: 'Supported Claims', color: 'bg-blue-50 text-blue-700 border-blue-100' },
+                                            { key: 'id_token_signing_alg_values_supported', label: 'ID Token Algorithms', color: 'bg-orange-50 text-orange-700 border-orange-100' }
+                                        ].map(({ key, label, color }) => config[key] && Array.isArray(config[key]) && (
+                                            <div key={key} className="bg-white rounded-lg p-4 border border-slate-200">
+                                                <h5 className="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-100 pb-2">{label}</h5>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {config[key].map((item: string) => (
+                                                        <span key={item} className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${color}`}>
+                                                            {item}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-6 pt-6 border-t border-slate-200">
+                                        <button 
+                                            onClick={() => setShowRawJson(!showRawJson)}
+                                            className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors select-none w-full text-left"
+                                        >
+                                            <div className="p-1 bg-slate-100 rounded group-hover:bg-slate-200 transition-colors">
+                                                <FileCodeIcon className="h-3 w-3" />
+                                            </div>
+                                            View Raw Discovery JSON
+                                            <span className="ml-auto text-[10px] font-normal text-slate-400">
+                                                {showRawJson ? 'Click to collapse' : 'Click to expand'}
+                                            </span>
+                                        </button>
+                                        
+                                        {showRawJson && (
+                                            <div className="mt-3 animate-fade-in">
+                                                <CodeBlock content={JSON.stringify(config, null, 2)} language="json" />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -425,7 +475,7 @@ const OidcTools: React.FC<OidcToolsProps> = ({ activeSubView }) => {
                                             <span>{copied ? 'Copied!' : 'Copy'}</span>
                                         </button>
                                     </div>
-                                    <CodeBlock code={JSON.stringify(userInfo, null, 2)} language="json" />
+                                    <CodeBlock content={JSON.stringify(userInfo, null, 2)} language="json" />
                                 </div>
                             )}
                         </div>
@@ -602,7 +652,7 @@ const OidcTools: React.FC<OidcToolsProps> = ({ activeSubView }) => {
                                         <h5 className="text-xs font-bold text-blue-800 mb-2">📤 Next Steps: Exchange for Access Token</h5>
                                         <p className="text-xs text-blue-700 mb-2">POST this assertion to the token endpoint:</p>
                                         <CodeBlock 
-                                            code={`POST ${assAudience}\nContent-Type: application/x-www-form-urlencoded\n\ngrant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${generatedAssertion}`}
+                                            content={`POST ${assAudience}\nContent-Type: application/x-www-form-urlencoded\n\ngrant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${generatedAssertion}`}
                                             language="http"
                                         />
                                     </div>
