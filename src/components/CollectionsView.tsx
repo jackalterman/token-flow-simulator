@@ -25,14 +25,19 @@ const CollectionsView: React.FC = () => {
         loadItems();
     }, []);
 
-    const loadItems = () => {
-        setItems(storageService.getItems().sort((a, b) => b.timestamp - a.timestamp));
+    const loadItems = async () => {
+        try {
+            const allItems = await storageService.getItems();
+            setItems(allItems.sort((a, b) => b.timestamp - a.timestamp));
+        } catch (err) {
+            console.error('Failed to load items', err);
+        }
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm('Are you sure you want to delete this item?')) {
-            storageService.deleteItem(id);
-            loadItems();
+            await storageService.deleteItem(id);
+            await loadItems();
             if (selectedItem?.id === id) setSelectedItem(null);
         }
     };

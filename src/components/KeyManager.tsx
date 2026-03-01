@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import CodeBlock from './CodeBlock';
 import { jwtService } from '../services/jwtService';
-import { KeyIcon, CertificateIcon, ClipboardIcon, CheckIcon, ShieldCheckIcon, AlertTriangleIcon, RefreshIcon, DownloadIcon } from './icons';
+import { storageService } from '../services/storageService';
+import { KeyIcon, CertificateIcon, ClipboardIcon, CheckIcon, ShieldCheckIcon, AlertTriangleIcon, RefreshIcon, DownloadIcon, SaveIcon } from './icons';
 import { KeyPair, DecoderData } from '../types';
 import CertificateAnalyzer from './CertificateAnalyzer';
 import ExportModal from './ExportModal';
@@ -91,6 +92,41 @@ const KeyManager: React.FC<KeyManagerProps> = ({ onSendToDecoder }) => {
         </button>
     );
   }
+
+  const SaveButton = ({ onClick, disabled, label = 'Save' }: { onClick: () => void, disabled?: boolean, label?: string }) => {
+    return (
+        <button 
+          onClick={onClick}
+          disabled={disabled}
+          className={`flex items-center space-x-1 px-3 py-1 rounded-md text-xs font-medium transition-all border ${
+              disabled 
+              ? 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed' 
+              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+          }`}
+          title="Save to Collection"
+        >
+          <SaveIcon className="w-3 h-3" />
+          <span>{label}</span>
+        </button>
+    );
+  }
+
+  const handleSaveToCollection = async (type: 'key' | 'certificate' | 'secret', title: string, content: string) => {
+    try {
+        await storageService.saveItem({
+            type,
+            title,
+            content,
+            metadata: {
+                alg: algType,
+                size: keySize,
+                generatedAt: new Date().toISOString()
+            }
+        });
+    } catch (e: any) {
+        alert(`Failed to save: ${e.message}`);
+    }
+  };
 
   const handleExportClick = (source: 'pem' | 'jwks' | 'cert') => {
       setExportSource(source);
@@ -230,6 +266,7 @@ const KeyManager: React.FC<KeyManagerProps> = ({ onSendToDecoder }) => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    <SaveButton onClick={() => handleSaveToCollection('key', `Public Key - ${algType}`, keyPair.publicKey)} />
                                     <ExportButton onClick={() => handleExportClick('pem')} />
                                     <CopyButton text={keyPair.publicKey} />
                                 </div>
@@ -252,6 +289,7 @@ const KeyManager: React.FC<KeyManagerProps> = ({ onSendToDecoder }) => {
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-3">
+                                    <SaveButton onClick={() => handleSaveToCollection('key', `Private Key - ${algType}`, keyPair.privateKey)} disabled={!showPrivate} />
                                     <ExportButton onClick={() => handleExportClick('pem')} disabled={!showPrivate} />
                                     <button 
                                         onClick={() => setShowPrivate(!showPrivate)}
@@ -299,6 +337,7 @@ const KeyManager: React.FC<KeyManagerProps> = ({ onSendToDecoder }) => {
                                     <p className="text-xs text-slate-500 mt-1">Standard format for exposing public keys (RFC 7517).</p>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    <SaveButton onClick={() => handleSaveToCollection('secret', `JWKS - ${algType}`, JSON.stringify(keyPair.jwks, null, 2))} />
                                     <ExportButton onClick={() => handleExportClick('jwks')} />
                                     <CopyButton text={JSON.stringify(keyPair.jwks, null, 2)} />
                                 </div>

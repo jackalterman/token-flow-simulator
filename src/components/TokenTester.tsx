@@ -49,6 +49,7 @@ const TokenTester: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showKeyPicker, setShowKeyPicker] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [secrets, setSecrets] = useState<any[]>([]);
 
   // Auto-hide toast
   useEffect(() => {
@@ -57,6 +58,21 @@ const TokenTester: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Load secrets for key picker
+  useEffect(() => {
+    if (showKeyPicker) {
+      const loadSecrets = async () => {
+        try {
+          const allItems = await storageService.getItems();
+          setSecrets(allItems.filter(i => i.type === 'secret' || i.type === 'key' || i.type === 'certificate'));
+        } catch (err) {
+          console.error('Failed to load secrets', err);
+        }
+      };
+      loadSecrets();
+    }
+  }, [showKeyPicker]);
 
   // Load state from IndexedDB
   useEffect(() => {
@@ -256,7 +272,6 @@ const TokenTester: React.FC = () => {
            (method !== 'GET' && method !== 'HEAD' ? `\n\n${body}` : '');
   };
 
-  const secrets = storageService.getItems().filter(i => i.type === 'secret' || i.type === 'key');
 
   return (
     <div className="space-y-6 relative">

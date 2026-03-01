@@ -277,28 +277,27 @@ const CertificateAnalyzer: React.FC<CertificateAnalyzerProps> = () => {
             </div>
             
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-               <button 
-                 onClick={() => {
-                   if (!selectedCert) return;
-                   storageService.saveItem({
-                     type: 'certificate',
-                     title: selectedCert.subject.split(',')[0],
-                     content: selectedCert.pem,
-                     metadata: {
-                       issuer: selectedCert.issuer,
-                       validFrom: selectedCert.validFrom,
-                       validTo: selectedCert.validTo,
-                       serial: selectedCert.serialNumber,
-                       thumbprint: selectedCert.thumbprint
-                     }
-                   });
-                   alert('Certificate saved to your collection!');
-                 }}
-                 className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 text-white text-sm font-bold rounded-lg hover:bg-sky-700 transition-colors shadow-sm"
-               >
-                 <SaveIcon className="h-4 w-4" />
-                 Save to Collection
-               </button>
+                <button 
+                  onClick={async () => {
+                    if (!selectedCert) return;
+                    await storageService.saveItem({
+                      type: 'certificate',
+                      title: selectedCert.subject.split(',')[0],
+                      content: selectedCert.pem,
+                      metadata: {
+                        issuer: selectedCert.issuer,
+                        validFrom: selectedCert.validFrom,
+                        validTo: selectedCert.validTo,
+                        serial: selectedCert.serialNumber,
+                        thumbprint: selectedCert.thumbprint
+                      }
+                    });
+                  }}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 text-white text-sm font-bold rounded-lg hover:bg-sky-700 transition-colors shadow-sm"
+                >
+                  <SaveIcon className="h-4 w-4" />
+                  Save to Collection
+                </button>
             </div>
           </div>
         </div>

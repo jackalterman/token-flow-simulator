@@ -1,38 +1,57 @@
 import { CollectionItem } from '../types';
+import { getCollectionItems, saveCollectionItem, deleteCollectionItem } from './jwtStorage';
 
 const STORAGE_KEY = 'SecurityTribeToolkit_collection';
+const MIGRATION_KEY = 'SecurityTribeToolkit_collection_migrated_v5';
 
 export const storageService = {
-  saveItem(item: Omit<CollectionItem, 'id' | 'timestamp'>): CollectionItem {
-    const items = this.getItems();
+  async saveItem(item: Omit<CollectionItem, 'id' | 'timestamp'>): Promise<CollectionItem> {
     const newItem: CollectionItem = {
       ...item,
       id: crypto.randomUUID(),
       timestamp: Date.now(),
     };
     
-    items.push(newItem);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    await saveCollectionItem(newItem);
     return newItem;
   },
 
-  getItems(): CollectionItem[] {
+  async getItems(): Promise<CollectionItem[]> {
+    // Check for migration
+    const isMigrated = localStorage.getItem(MIGRATION_KEY);
+    if (!isMigrated) {
+      await this.migrateFromLocalStorage();
+    }
+    
+    return await getCollectionItems();
+  },
+
+  async migrateFromLocalStorage(): Promise<void> {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error('Failed to parse stored items', e);
-      return [];
+    if (stored) {
+      try {
+        const items: CollectionItem[] = JSON.parse(stored);
+        for (const item of items) {
+          await saveCollectionItem(item);
+        }
+        localStorage.setItem(MIGRATION_KEY, 'true');
+        // We keep the old data in localStorage for a while just in case, 
+        // but mark it as migrated.
+      } catch (e) {
+        console.error('Migration failed', e);
+      }
+    } else {
+      localStorage.setItem(MIGRATION_KEY, 'true');
     }
   },
 
-  deleteItem(id: string): void {
-    const items = this.getItems().filter(item => item.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  async deleteItem(id: string): Promise<void> {
+    await deleteCollectionItem(id);
   },
 
   clearItems(): void {
+    // Not typically used for IDB without a clear all method, 
+    // but we can implement it if needed.
     localStorage.removeItem(STORAGE_KEY);
   },
 

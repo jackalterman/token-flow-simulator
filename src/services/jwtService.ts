@@ -74,8 +74,8 @@ function exportPem(keyData: ArrayBuffer, type: 'public' | 'private'): string {
 
 function importPem(pem: string, type: 'public' | 'private') {
     const b64 = pem
-        .replace(/-----BEGIN (PUBLIC|PRIVATE) KEY-----/, '')
-        .replace(/-----END (PUBLIC|PRIVATE) KEY-----/, '')
+        .replace(/-----BEGIN [^-]+-----/g, '')
+        .replace(/-----END [^-]+-----/g, '')
         .replace(/\s/g, '');
     return base64ToArrayBuffer(b64);
 }

@@ -4,7 +4,8 @@ import CodeBlock from './CodeBlock';
 import { jwtService } from '../services/jwtService';
 import { storageService } from '../services/storageService';
 import { getJwtEncoderState, saveJwtEncoderState, JwtEncoderState } from '../services/jwtStorage';
-import { SendIcon, KeyIcon, SaveIcon, RefreshIcon } from './icons';
+import { SendIcon, KeyIcon, SaveIcon, RefreshIcon, DownloadIcon, ShieldCheckIcon, CertificateIcon, TrashIcon, XIcon, PlusIcon, LockClosedIcon } from './icons';
+import { keyParsingService, ParsedKeyResult } from '../services/keyParsingService';
 import type { DecoderData } from '../types';
 
 interface JwtEncoderProps {
@@ -30,6 +31,10 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
   const [error, setError] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [password, setPassword] = useState('');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Load state from IndexedDB
   useEffect(() => {
@@ -109,6 +114,80 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
             token: generatedToken,
             key: alg === 'HS256' ? secret : publicKey,
         });
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.name.toLowerCase().endsWith('.p12') || file.name.toLowerCase().endsWith('.pfx')) {
+        setPendingFile(file);
+        setShowPasswordModal(true);
+    } else {
+        try {
+            const result = await keyParsingService.parseFile(file);
+            applyParsingResult(result);
+        } catch (err: any) {
+            setError(err.message);
+        }
+    }
+    // Clear input
+    e.target.value = '';
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!pendingFile) return;
+    try {
+        const result = await keyParsingService.parseFile(pendingFile, password);
+        applyParsingResult(result);
+        setShowPasswordModal(false);
+        setPassword('');
+        setPendingFile(null);
+    } catch (err: any) {
+        setError(`Decryption failed: ${err.message}`);
+    }
+  };
+
+  const applyParsingResult = (result: ParsedKeyResult) => {
+    if (result.privateKey) {
+        setPrivateKey(result.privateKey);
+        setShowSecret(true);
+    }
+    if (result.publicKey) setPublicKey(result.publicKey);
+    setSuccessMessage(`Loaded ${result.format} ${result.type}`);
+    setTimeout(() => setSuccessMessage(''), 3000);
+  };
+
+  const handleSaveToCollection = async (type: 'jwt' | 'key' | 'certificate') => {
+    try {
+        let content = '';
+        let title = '';
+        
+        if (type === 'jwt') {
+            content = generatedToken;
+            title = `JWT - ${JSON.parse(payload).sub || 'Untitled'}`;
+        } else if (type === 'key') {
+            content = privateKey;
+            title = `Private Key - ${alg}`;
+        } else if (type === 'certificate') {
+            content = publicKey;
+            title = `Public Key/Cert - ${alg}`;
+        }
+
+        await storageService.saveItem({
+            type,
+            title,
+            content,
+            metadata: {
+                alg,
+                generatedAt: new Date().toISOString()
+            }
+        });
+        setSuccessMessage(`${type} saved to collection!`);
+        setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (e: any) {
+        setError(`Failed to save: ${e.message}`);
     }
   };
 
@@ -197,21 +276,43 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
                 </div>
             ) : (
                 <div className="space-y-4">
-                <button
-                    onClick={handleGenerateKeys}
-                    className="w-full inline-flex justify-center items-center gap-2 py-2.5 px-4 border border-slate-300 shadow-sm text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
-                >
-                    <KeyIcon className="h-5 w-5 text-slate-500" /> Generate New {alg === 'RS256' ? 'RSA' : 'EC'} Key Pair
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleGenerateKeys}
+                        className="flex-1 inline-flex justify-center items-center gap-2 py-2.5 px-4 border border-slate-300 shadow-sm text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 transition-colors"
+                    >
+                        <KeyIcon className="h-4 w-4 text-sky-500" /> New Keys
+                    </button>
+                    <label className="flex-1 inline-flex justify-center items-center gap-2 py-2.5 px-4 border border-slate-300 shadow-sm text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 cursor-pointer transition-colors">
+                        <DownloadIcon className="h-4 w-4 text-sky-500" /> Upload Key
+                        <input type="file" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                </div>
+
+                {successMessage && (
+                    <div className="p-2 bg-green-50 border border-green-200 text-green-700 text-xs rounded-lg animate-fade-in flex items-center justify-center">
+                        <ShieldCheckIcon className="h-3 w-3 mr-1" /> {successMessage}
+                    </div>
+                )}
+
                 <div>
                     <div className="flex justify-between items-center mb-1">
                         <label htmlFor="jwt-private-key" className="block text-sm font-semibold text-slate-700">Private Key (PEM)</label>
-                         <button 
-                            onClick={() => setShowSecret(!showSecret)}
-                            className="text-xs text-sky-600 hover:text-sky-700 font-medium"
-                        >
-                            {showSecret ? 'Hide' : 'Show'}
-                        </button>
+                         <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => handleSaveToCollection('key')}
+                                className="text-[10px] text-slate-500 hover:text-sky-600 font-bold uppercase tracking-tight flex items-center gap-1"
+                                disabled={!privateKey}
+                            >
+                                <SaveIcon className="h-3 w-3" /> Save to Coll.
+                            </button>
+                            <button 
+                                onClick={() => setShowSecret(!showSecret)}
+                                className="text-xs text-sky-600 hover:text-sky-700 font-medium"
+                            >
+                                {showSecret ? 'Hide' : 'Show'}
+                            </button>
+                        </div>
                     </div>
                     <textarea
                     id="jwt-private-key"
@@ -224,7 +325,16 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
                     />
                 </div>
                 <div>
-                    <label htmlFor="jwt-public-key" className="block text-sm font-semibold text-slate-700 mb-1">Public Key (PEM)</label>
+                    <div className="flex justify-between items-center mb-1">
+                        <label htmlFor="jwt-public-key" className="block text-sm font-semibold text-slate-700">Public Key (PEM)</label>
+                         <button 
+                            onClick={() => handleSaveToCollection('certificate')}
+                            className="text-[10px] text-slate-500 hover:text-sky-600 font-bold uppercase tracking-tight flex items-center gap-1"
+                            disabled={!publicKey}
+                        >
+                            <SaveIcon className="h-3 w-3" /> Save
+                        </button>
+                    </div>
                     <textarea
                     id="jwt-public-key"
                     rows={4}
@@ -293,8 +403,8 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
                         Send to Decoder
                     </button>
                     <button
-                        onClick={() => {
-                            storageService.saveItem({
+                        onClick={async () => {
+                            await storageService.saveItem({
                                 type: 'jwt',
                                 title: `JWT - ${JSON.parse(payload).sub || 'Untitled'}`,
                                 content: generatedToken,
@@ -303,7 +413,6 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
                                     alg: JSON.parse(header).alg
                                 }
                             });
-                            alert('JWT saved to collection!');
                         }}
                         className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-300 shadow-sm text-sm font-bold rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
                     >
@@ -319,6 +428,48 @@ const JwtEncoder: React.FC<JwtEncoderProps> = ({ onSendToDecoder }) => {
           </div>
         )}
       </div>
+      {/* Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in border border-slate-200">
+                <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                    <h3 className="font-bold text-slate-800">Keystore Password</h3>
+                    <button onClick={() => setShowPasswordModal(false)} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
+                        <XIcon className="h-5 w-5 text-slate-500" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="flex items-center gap-3 p-3 bg-blue-50 text-blue-800 rounded-xl text-xs border border-blue-100">
+                        <LockClosedIcon className="h-5 w-5 text-blue-500 shrink-0" />
+                        <p>This PKCS#12 file is encrypted. Enter the password to decrypt it locally.</p>
+                    </div>
+                    <input 
+                        type="password"
+                        placeholder="Password"
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+                        autoFocus
+                    />
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => setShowPasswordModal(false)}
+                            className="flex-1 py-2 px-4 border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={handlePasswordSubmit}
+                            className="flex-1 py-2 px-4 bg-sky-600 text-white font-bold rounded-lg hover:bg-sky-700 transition-colors shadow-sm"
+                        >
+                            Decrypt
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

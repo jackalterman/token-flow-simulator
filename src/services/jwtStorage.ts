@@ -1,5 +1,5 @@
 const DB_NAME = 'SecurityTribeToolkitDB';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export interface JwtEncoderState {
     alg: string;
@@ -37,7 +37,43 @@ const openDB = (): Promise<IDBDatabase> => {
             if (!db.objectStoreNames.contains('token-tester')) db.createObjectStore('token-tester');
             if (!db.objectStoreNames.contains('jwt-encoder')) db.createObjectStore('jwt-encoder');
             if (!db.objectStoreNames.contains('jwt-decoder')) db.createObjectStore('jwt-decoder');
+            if (!db.objectStoreNames.contains('collection')) {
+                db.createObjectStore('collection', { keyPath: 'id' });
+            }
         };
+    });
+};
+
+export const saveCollectionItem = async (item: any): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['collection'], 'readwrite');
+        const store = transaction.objectStore('collection');
+        const request = store.put(item);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject('Error saving collection item');
+    });
+};
+
+export const getCollectionItems = async (): Promise<any[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['collection'], 'readonly');
+        const store = transaction.objectStore('collection');
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject('Error reading collections');
+    });
+};
+
+export const deleteCollectionItem = async (id: string): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['collection'], 'readwrite');
+        const store = transaction.objectStore('collection');
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject('Error deleting collection item');
     });
 };
 
