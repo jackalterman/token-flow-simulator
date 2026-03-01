@@ -63,7 +63,7 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
   const [activeStatuses, setActiveStatuses] = usePersistentState<string[]>('har-active-statuses', []);
   const [sortField, setSortField] = useState<keyof HarEntry | 'name' | 'size'>('startedDateTime');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [isCookiesOpen, setIsCookiesOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'headers' | 'payload' | 'response' | 'cookies'>('headers');
   const [prettyPrintContent, setPrettyPrintContent] = useState<{ title: string, body: string } | null>(null);
 
   const resourceTypes = ['xhr', 'document', 'script', 'stylesheet', 'image', 'font'];
@@ -400,152 +400,165 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                            </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                            {/* Cookies Section (Accordion) */}
-                            <section className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                <button 
-                                    onClick={() => setIsCookiesOpen(!isCookiesOpen)}
-                                    className="w-full p-3 flex items-center justify-between hover:bg-slate-100 transition-all text-left"
+                        <div className="flex border-b border-slate-100 bg-slate-50/30 px-4 shrink-0">
+                            {[
+                                { id: 'headers', label: 'Headers' },
+                                { id: 'payload', label: 'Payload', active: !!(selectedEntry.request.postData || selectedEntry.request.queryString.length > 0) },
+                                { id: 'response', label: 'Response', active: !!selectedEntry.response.content.text },
+                                { id: 'cookies', label: 'Cookies', count: selectedEntry.request.cookies.length + selectedEntry.response.cookies.length }
+                            ].map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`relative px-4 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${
+                                        activeTab === tab.id 
+                                        ? 'text-sky-600 border-b-2 border-sky-600 bg-white' 
+                                        : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
+                                    }`}
                                 >
                                     <div className="flex items-center space-x-2">
-                                        <ActivityIcon className="h-4 w-4 text-indigo-600" />
-                                        <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                                            Cookies ({selectedEntry.request.cookies.length + selectedEntry.response.cookies.length})
-                                        </h4>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-[9px] text-slate-400 italic">Click to {isCookiesOpen ? 'collapse' : 'expand'}</span>
-                                        {isCookiesOpen ? <ChevronUpIcon className="h-4 w-4 text-slate-400" /> : <ChevronDownIcon className="h-4 w-4 text-slate-400" />}
+                                        <span>{tab.label}</span>
+                                        {tab.active && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />}
+                                        {tab.count !== undefined && <span className={`px-1 rounded ${activeTab === tab.id ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-500'} text-[9px]`}>{tab.count}</span>}
                                     </div>
                                 </button>
-                                
-                                {isCookiesOpen && (
-                                    <div className="border-t border-slate-200 divide-y divide-slate-100 animate-in slide-in-from-top-2 duration-200">
-                                        <div className="px-3 py-1.5 bg-slate-100/50 flex justify-between items-center">
-                                            <span className="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Cookie Name & Value</span>
+                            ))}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white">
+                            {activeTab === 'headers' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    <section>
+                                        <div className="bg-slate-50 rounded-lg border border-slate-100 overflow-hidden text-[11px]">
+                                            <div className="p-2 bg-slate-100/50 font-bold text-slate-500 border-b border-slate-100">General</div>
+                                            <div className="p-2 space-y-1 font-mono">
+                                                <div className="flex"><span className="text-sky-700 font-bold min-w-[100px]">Request URL:</span> <span className="text-slate-600 break-all">{selectedEntry.request.url}</span></div>
+                                                <div className="flex"><span className="text-sky-700 font-bold min-w-[100px]">Method:</span> <span className="text-slate-600">{selectedEntry.request.method}</span></div>
+                                                <div className="flex"><span className="text-sky-700 font-bold min-w-[100px]">Status:</span> <span className={`${getStatusColor(selectedEntry.response.status)}`}>{selectedEntry.response.status}</span></div>
+                                            </div>
+                                            <div className="p-2 bg-slate-100/50 font-bold text-slate-500 border-y border-slate-100">Response Headers</div>
+                                            <div className="p-2 space-y-1 font-mono">
+                                                {selectedEntry.response.headers.map((h, i) => (
+                                                    <div key={i} className="flex"><span className="text-sky-700 font-bold min-w-[140px] shrink-0">{h.name}:</span> <span className="text-slate-600 break-all">{h.value}</span></div>
+                                                ))}
+                                            </div>
+                                            <div className="p-2 bg-slate-100/50 font-bold text-slate-500 border-y border-slate-100">Request Headers</div>
+                                            <div className="p-2 space-y-1 font-mono">
+                                                {selectedEntry.request.headers.map((h, i) => (
+                                                    <div key={i} className="group flex items-start gap-2">
+                                                        <span className="text-sky-700 font-bold min-w-[140px] shrink-0 border-r border-slate-200 pr-2">{h.name}:</span> 
+                                                        <span className="text-slate-600 break-all flex-1">{h.value}</span>
+                                                        {(h.name.toLowerCase().includes('token') || h.value.startsWith('Bearer ')) && onSendToDecoder && (
+                                                            <button 
+                                                                onClick={() => onSendToDecoder({ token: h.value.replace('Bearer ', ''), key: '' })}
+                                                                className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 bg-sky-100 text-sky-700 rounded-[4px] text-[8px] font-bold"
+                                                            >Decode</button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+                            )}
+
+                            {activeTab === 'payload' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                     {selectedEntry.request.postData ? (
+                                        <section>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Request Body ({selectedEntry.request.postData.mimeType})</h4>
+                                                <button 
+                                                    onClick={() => setPrettyPrintContent({ title: 'Request Body', body: selectedEntry.request.postData?.text || '' })}
+                                                    className="px-2 py-0.5 bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-700 rounded text-[9px] font-bold transition-colors"
+                                                >
+                                                    View Pretty
+                                                </button>
+                                            </div>
+                                            <div className="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-emerald-400 whitespace-pre-wrap break-all max-h-[60vh] overflow-y-auto border border-slate-800">
+                                                {selectedEntry.request.postData.text}
+                                            </div>
+                                        </section>
+                                    ) : (
+                                        <div className="p-8 text-center text-slate-400 italic text-xs">No request body provided</div>
+                                    )}
+
+                                    {selectedEntry.request.queryString.length > 0 && (
+                                        <section>
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Query Parameters</h4>
+                                            <div className="bg-slate-50 rounded-lg border border-slate-100 p-2 space-y-1 font-mono text-[11px]">
+                                                {selectedEntry.request.queryString.map((p, i) => (
+                                                    <div key={i} className="flex gap-2">
+                                                        <span className="text-indigo-700 font-bold min-w-[100px] shrink-0">{p.name}:</span>
+                                                        <span className="text-slate-600 break-all">{p.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'response' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    {selectedEntry.response.content.text ? (
+                                        <section>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center space-x-2">
+                                                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Response Body</h4>
+                                                    <span className="text-[9px] text-slate-400 font-mono italic">({selectedEntry.response.content.mimeType})</span>
+                                                </div>
+                                                <button 
+                                                    onClick={() => setPrettyPrintContent({ title: 'Response Body', body: selectedEntry.response.content.text || '' })}
+                                                    className="px-2 py-0.5 bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-700 rounded text-[9px] font-bold transition-colors"
+                                                >
+                                                    View Pretty
+                                                </button>
+                                            </div>
+                                            <div className="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-sky-400 whitespace-pre-wrap break-all max-h-[60vh] overflow-y-auto border border-slate-800">
+                                                {selectedEntry.response.content.text}
+                                            </div>
+                                        </section>
+                                    ) : (
+                                        <div className="p-8 text-center text-slate-400 italic text-xs">No response content available</div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'cookies' && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    <section className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                        <div className="px-3 py-2.5 bg-slate-100/50 flex justify-between items-center border-b border-slate-200">
+                                            <h4 className="text-[10px] font-bold text-slate-700 uppercase tracking-widest">Cookie Diagnostics</h4>
                                             <span className="text-[8px] text-slate-400 italic">Click value to copy</span>
                                         </div>
-                                        {[...selectedEntry.request.cookies, ...selectedEntry.response.cookies].length > 0 ? (
-                                            [...selectedEntry.request.cookies, ...selectedEntry.response.cookies].map((cookie, i) => {
-                                                const isPega = PEGA_COOKIES.some(p => cookie.name.toLowerCase().includes(p.toLowerCase()));
-                                                return (
-                                                    <div key={i} className={`p-2.5 flex items-start gap-2 hover:bg-white transition-colors cursor-pointer group`} onClick={() => handleCopy(cookie.value, `c-${i}`)}>
-                                                        <div className={`shrink-0 w-1.5 h-1.5 rounded-full mt-1.5 ${isPega ? 'bg-indigo-500 animate-pulse outline outline-4 outline-indigo-50' : 'bg-slate-300'}`} />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-0.5">
-                                                                <span className={`font-bold text-[11px] ${isPega ? 'text-indigo-700' : 'text-slate-700'}`}>{cookie.name}</span>
-                                                                {isPega && <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter">Pega</span>}
-                                                                {copied === `c-${i}` && <span className="text-[8px] text-emerald-600 font-bold ml-auto flex items-center bg-emerald-50 px-1 rounded"><CheckIcon className="h-2 w-2 mr-0.5" /> Copied</span>}
-                                                            </div>
-                                                            <div className="text-[10px] font-mono text-slate-500 break-all line-clamp-2 group-hover:line-clamp-none transition-all">
-                                                                {cookie.value}
+                                        <div className="divide-y divide-slate-100">
+                                            {[...selectedEntry.request.cookies, ...selectedEntry.response.cookies].length > 0 ? (
+                                                [...selectedEntry.request.cookies, ...selectedEntry.response.cookies].map((cookie, i) => {
+                                                    const isPega = PEGA_COOKIES.some(p => cookie.name.toLowerCase().includes(p.toLowerCase()));
+                                                    return (
+                                                        <div key={i} className={`p-2.5 flex items-start gap-2 hover:bg-white transition-colors cursor-pointer group`} onClick={() => handleCopy(cookie.value, `c-${i}`)}>
+                                                            <div className={`shrink-0 w-1.5 h-1.5 rounded-full mt-1.5 ${isPega ? 'bg-indigo-500 animate-pulse outline outline-4 outline-indigo-50' : 'bg-slate-300'}`} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2 mb-0.5">
+                                                                    <span className={`font-bold text-[11px] ${isPega ? 'text-indigo-700' : 'text-slate-700'}`}>{cookie.name}</span>
+                                                                    {isPega && <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter">Pega</span>}
+                                                                    {copied === `c-${i}` && <span className="text-[8px] text-emerald-600 font-bold ml-auto flex items-center bg-emerald-50 px-1 rounded"><CheckIcon className="h-2 w-2 mr-0.5" /> Copied</span>}
+                                                                </div>
+                                                                <div className="text-[10px] font-mono text-slate-500 break-all line-clamp-2 group-hover:line-clamp-none transition-all">
+                                                                    {cookie.value}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="p-4 text-center text-slate-400 italic text-[11px]">No cookies found in this request</div>
-                                        )}
-                                    </div>
-                                )}
-                            </section>
-
-                            {/* Tabs Style Sections */}
-                            <div className="space-y-6">
-                                {/* Headers */}
-                                <section>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Headers</h4>
-                                        <button 
-                                            onClick={() => handleCopy(JSON.stringify(selectedEntry.request.headers, null, 2), 'h')}
-                                            className="text-slate-400 hover:text-sky-600"
-                                        >
-                                            <ClipboardIcon className="h-3 w-3" />
-                                        </button>
-                                    </div>
-                                    <div className="bg-slate-50 rounded-lg border border-slate-100 overflow-hidden text-[11px]">
-                                        <div className="p-2 bg-slate-100/50 font-bold text-slate-500 border-b border-slate-100">General</div>
-                                        <div className="p-2 space-y-1 font-mono">
-                                            <div className="flex"><span className="text-sky-700 font-bold min-w-[100px]">Request URL:</span> <span className="text-slate-600 break-all">{selectedEntry.request.url}</span></div>
-                                            <div className="flex"><span className="text-sky-700 font-bold min-w-[100px]">Method:</span> <span className="text-slate-600">{selectedEntry.request.method}</span></div>
-                                            <div className="flex"><span className="text-sky-700 font-bold min-w-[100px]">Status:</span> <span className={`${getStatusColor(selectedEntry.response.status)}`}>{selectedEntry.response.status}</span></div>
-                                        </div>
-                                        <div className="p-2 bg-slate-100/50 font-bold text-slate-500 border-y border-slate-100">Response Headers</div>
-                                        <div className="p-2 space-y-1 font-mono">
-                                            {selectedEntry.response.headers.map((h, i) => (
-                                                <div key={i} className="flex"><span className="text-sky-700 font-bold min-w-[140px] shrink-0">{h.name}:</span> <span className="text-slate-600 break-all">{h.value}</span></div>
-                                            ))}
-                                        </div>
-                                        <div className="p-2 bg-slate-100/50 font-bold text-slate-500 border-y border-slate-100">Request Headers</div>
-                                        <div className="p-2 space-y-1 font-mono">
-                                            {selectedEntry.request.headers.map((h, i) => (
-                                                <div key={i} className="group flex items-start gap-2">
-                                                    <span className="text-sky-700 font-bold min-w-[140px] shrink-0 border-r border-slate-200 pr-2">{h.name}:</span> 
-                                                    <span className="text-slate-600 break-all flex-1">{h.value}</span>
-                                                    {(h.name.toLowerCase().includes('token') || h.value.startsWith('Bearer ')) && onSendToDecoder && (
-                                                        <button 
-                                                            onClick={() => onSendToDecoder({ token: h.value.replace('Bearer ', ''), key: '' })}
-                                                            className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 bg-sky-100 text-sky-700 rounded-[4px] text-[8px] font-bold"
-                                                        >Decode</button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </section>
-
-                                 {/* Request Body */}
-                                {selectedEntry.request.postData && (
-                                    <section>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Request Body ({selectedEntry.request.postData.mimeType})</h4>
-                                            <button 
-                                                onClick={() => setPrettyPrintContent({ title: 'Request Body', body: selectedEntry.request.postData?.text || '' })}
-                                                className="px-2 py-0.5 bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-700 rounded text-[9px] font-bold transition-colors"
-                                            >
-                                                View Pretty
-                                            </button>
-                                        </div>
-                                        <div className="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-emerald-400 whitespace-pre-wrap break-all max-h-48 overflow-y-auto border border-slate-800">
-                                            {selectedEntry.request.postData.text}
+                                                    );
+                                                })
+                                            ) : (
+                                                <div className="p-8 text-center text-slate-400 italic text-[11px]">No cookies found in this request</div>
+                                            )}
                                         </div>
                                     </section>
-                                )}
-
-                                {/* Response Content */}
-                                {selectedEntry.response.content.text && (
-                                    <section>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Response Body</h4>
-                                            <button 
-                                                onClick={() => setPrettyPrintContent({ title: 'Response Body', body: selectedEntry.response.content.text || '' })}
-                                                className="px-2 py-0.5 bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-700 rounded text-[9px] font-bold transition-colors"
-                                            >
-                                                View Pretty
-                                            </button>
-                                        </div>
-                                        <div className="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-sky-400 whitespace-pre-wrap break-all max-h-64 overflow-y-auto border border-slate-800">
-                                            {selectedEntry.response.content.text}
-                                        </div>
-                                    </section>
-                                )}
-
-                                 {/* Query Params */}
-                                 {selectedEntry.request.queryString.length > 0 && (
-                                    <section>
-                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Query Parameters</h4>
-                                        <div className="bg-slate-50 rounded-lg border border-slate-100 p-2 space-y-1 font-mono text-[11px]">
-                                            {selectedEntry.request.queryString.map((p, i) => (
-                                                <div key={i} className="flex gap-2">
-                                                    <span className="text-indigo-700 font-bold min-w-[100px] shrink-0">{p.name}:</span>
-                                                    <span className="text-slate-600 break-all">{p.value}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </section>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
