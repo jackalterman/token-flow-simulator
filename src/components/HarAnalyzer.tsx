@@ -11,10 +11,16 @@ import {
   TrashIcon,
   ActivityIcon,
   AlertTriangleIcon,
-  SearchIcon as DetailIcon
+  SearchIcon as DetailIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  XIcon,
+  UploadIcon
 } from './icons';
 import { HarRoot, HarEntry, filterEntries, parseHarFile } from '../services/har';
-import { saveHarToDB, getHarFromDB, clearHarFromDB } from '../services/harStorage';
+import { saveHarToDB, getHarFromDB, clearHarFromDB, getHarMetadataFromDB, deleteHarFromDB, HarMetadata } from '../services/harStorage';
+
+const PEGA_COOKIES = ['Pega-AAT', 'Pega-Perf', 'Pega-RULES', 'Pega-ThreadName', 'Pega-UI-SessId'];
 
 interface HarAnalyzerProps {
   onSendToDecoder?: (data: any) => void;
@@ -22,14 +28,33 @@ interface HarAnalyzerProps {
 
 const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
   const [harData, setHarData] = useState<HarRoot | null>(null);
+  const [savedHars, setSavedHars] = useState<HarMetadata[]>([]);
+  const [currentHarId, setCurrentHarId] = usePersistentState<string | null>('har-current-id', null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    getHarFromDB()
-      .then(data => setHarData(data))
-      .catch(console.error)
-      .finally(() => setIsLoading(false));
+    const loadHars = async () => {
+        try {
+            const metadata = await getHarMetadataFromDB();
+            if (metadata) {
+                setSavedHars(metadata);
+                // Load the last used one or the first one
+                const idToLoad = currentHarId || metadata[0]?.id;
+                if (idToLoad) {
+                    const data = await getHarFromDB(idToLoad);
+                    setHarData(data);
+                    if (!currentHarId) setCurrentHarId(idToLoad);
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    loadHars();
   }, []);
+
   const [searchQuery, setSearchQuery] = usePersistentState('har-search-query', '');
   const [selectedEntry, setSelectedEntry] = useState<HarEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +63,8 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
   const [activeStatuses, setActiveStatuses] = usePersistentState<string[]>('har-active-statuses', []);
   const [sortField, setSortField] = useState<keyof HarEntry | 'name' | 'size'>('startedDateTime');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [isCookiesOpen, setIsCookiesOpen] = useState(false);
+  const [prettyPrintContent, setPrettyPrintContent] = useState<{ title: string, body: string } | null>(null);
 
   const resourceTypes = ['xhr', 'document', 'script', 'stylesheet', 'image', 'font'];
   const statusRanges = ['2xx', '3xx', '4xx', '5xx'];
@@ -64,11 +91,19 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
       try {
         const content = e.target?.result as string;
         const parsed = parseHarFile(content);
-        await saveHarToDB(parsed);
+        const newId = await saveHarToDB(parsed, file.name);
+        
         setHarData(parsed);
+        setCurrentHarId(newId);
+        
+        // Refresh metadata
+        const metadata = await getHarMetadataFromDB();
+        if (metadata) setSavedHars(metadata);
+        
         setError(null);
         setSelectedEntry(null);
       } catch (err: any) {
+        console.error('HAR Parsing Error:', err);
         setError(err.message || 'Failed to parse HAR file.');
         setHarData(null);
       } finally {
@@ -80,6 +115,38 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
         setIsLoading(false);
     }
     reader.readAsText(file);
+  };
+
+  const switchHar = async (id: string) => {
+    setIsLoading(true);
+    try {
+        const data = await getHarFromDB(id);
+        setHarData(data);
+        setCurrentHarId(id);
+        setSelectedEntry(null);
+    } catch (err) {
+        setError('Failed to load HAR');
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  const deleteHar = async (id: string) => {
+    await deleteHarFromDB(id);
+    const metadata = await getHarMetadataFromDB() || [];
+    setSavedHars(metadata);
+    if (currentHarId === id) {
+        if (metadata.length > 0) switchHar(metadata[0].id);
+        else setHarData(null);
+    }
+  };
+
+  const clearAllHars = async () => {
+    await clearHarFromDB();
+    setSavedHars([]);
+    setHarData(null);
+    setCurrentHarId(null);
+    setSelectedEntry(null);
   };
 
   const filteredEntries = useMemo(() => {
@@ -165,7 +232,7 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
         <div className="flex-1 flex items-center justify-center">
             <div className="bg-white rounded-2xl shadow-sm border-2 border-dashed border-slate-200 p-12 text-center max-w-md w-full">
                 <div className="bg-sky-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-sky-100 shadow-sm">
-                <RefreshIcon className="h-8 w-8 text-sky-600" />
+                <UploadIcon className="h-8 w-8 text-sky-600" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-2">Upload HAR File</h3>
                 <p className="text-slate-500 mb-8">
@@ -215,25 +282,36 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
+                            <div className="flex items-center bg-white border border-slate-200 rounded-xl px-2 shadow-sm">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2 ml-1">Recent:</span>
+                                <select 
+                                    className="bg-transparent py-2 text-xs font-semibold text-slate-600 outline-none focus:ring-0 min-w-[120px]"
+                                    value={currentHarId || ''}
+                                    onChange={(e) => switchHar(e.target.value)}
+                                >
+                                    {savedHars.map(h => (
+                                        <option key={h.id} value={h.id}>{h.name}</option>
+                                    ))}
+                                    {savedHars.length === 0 && <option value="">No HARs saved</option>}
+                                </select>
+                                {currentHarId && (
+                                    <button 
+                                        onClick={() => deleteHar(currentHarId)}
+                                        className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
+                                        title="Delete this HAR"
+                                    >
+                                        <TrashIcon className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <label className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all border border-slate-200 bg-white shadow-sm cursor-pointer" title="Upload New HAR">
+                                <UploadIcon className="h-5 w-5" />
+                                <input type="file" accept=".har,.json" className="hidden" onChange={handleFileUpload} />
+                            </label>
                             <button 
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setActiveTypes([]);
-                                    setActiveStatuses([]);
-                                }}
-                                className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all border border-slate-200 bg-white shadow-sm"
-                                title="Reset Filters"
-                            >
-                                <TrashIcon className="h-5 w-5" />
-                            </button>
-                            <button 
-                                onClick={async () => {
-                                    await clearHarFromDB();
-                                    setHarData(null);
-                                    setSelectedEntry(null);
-                                }}
+                                onClick={clearAllHars}
                                 className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-slate-200 bg-white shadow-sm"
-                                title="Clear HAR"
+                                title="Clear All History"
                             >
                                 <RefreshIcon className="h-5 w-5" />
                             </button>
@@ -323,20 +401,55 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                            {/* Analysis/Insights Section */}
-                            {(selectedEntry.analysis?.securityIssues.length || 0) > 0 && (
-                                <section className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                                    <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center">
-                                        <AlertTriangleIcon className="h-3 w-3 mr-1" />
-                                        Security Insights
-                                    </h4>
-                                    <ul className="text-[11px] text-amber-900 space-y-1 list-disc pl-4">
-                                        {selectedEntry.analysis?.securityIssues.map((issue, i) => (
-                                            <li key={i}>{issue}</li>
-                                        ))}
-                                    </ul>
-                                </section>
-                            )}
+                            {/* Cookies Section (Accordion) */}
+                            <section className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                <button 
+                                    onClick={() => setIsCookiesOpen(!isCookiesOpen)}
+                                    className="w-full p-3 flex items-center justify-between hover:bg-slate-100 transition-all text-left"
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <ActivityIcon className="h-4 w-4 text-indigo-600" />
+                                        <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                                            Cookies ({selectedEntry.request.cookies.length + selectedEntry.response.cookies.length})
+                                        </h4>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-[9px] text-slate-400 italic">Click to {isCookiesOpen ? 'collapse' : 'expand'}</span>
+                                        {isCookiesOpen ? <ChevronUpIcon className="h-4 w-4 text-slate-400" /> : <ChevronDownIcon className="h-4 w-4 text-slate-400" />}
+                                    </div>
+                                </button>
+                                
+                                {isCookiesOpen && (
+                                    <div className="border-t border-slate-200 divide-y divide-slate-100 animate-in slide-in-from-top-2 duration-200">
+                                        <div className="px-3 py-1.5 bg-slate-100/50 flex justify-between items-center">
+                                            <span className="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Cookie Name & Value</span>
+                                            <span className="text-[8px] text-slate-400 italic">Click value to copy</span>
+                                        </div>
+                                        {[...selectedEntry.request.cookies, ...selectedEntry.response.cookies].length > 0 ? (
+                                            [...selectedEntry.request.cookies, ...selectedEntry.response.cookies].map((cookie, i) => {
+                                                const isPega = PEGA_COOKIES.some(p => cookie.name.toLowerCase().includes(p.toLowerCase()));
+                                                return (
+                                                    <div key={i} className={`p-2.5 flex items-start gap-2 hover:bg-white transition-colors cursor-pointer group`} onClick={() => handleCopy(cookie.value, `c-${i}`)}>
+                                                        <div className={`shrink-0 w-1.5 h-1.5 rounded-full mt-1.5 ${isPega ? 'bg-indigo-500 animate-pulse outline outline-4 outline-indigo-50' : 'bg-slate-300'}`} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-0.5">
+                                                                <span className={`font-bold text-[11px] ${isPega ? 'text-indigo-700' : 'text-slate-700'}`}>{cookie.name}</span>
+                                                                {isPega && <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter">Pega</span>}
+                                                                {copied === `c-${i}` && <span className="text-[8px] text-emerald-600 font-bold ml-auto flex items-center bg-emerald-50 px-1 rounded"><CheckIcon className="h-2 w-2 mr-0.5" /> Copied</span>}
+                                                            </div>
+                                                            <div className="text-[10px] font-mono text-slate-500 break-all line-clamp-2 group-hover:line-clamp-none transition-all">
+                                                                {cookie.value}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="p-4 text-center text-slate-400 italic text-[11px]">No cookies found in this request</div>
+                                        )}
+                                    </div>
+                                )}
+                            </section>
 
                             {/* Tabs Style Sections */}
                             <div className="space-y-6">
@@ -382,11 +495,19 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                                     </div>
                                 </section>
 
-                                {/* Request Body */}
+                                 {/* Request Body */}
                                 {selectedEntry.request.postData && (
                                     <section>
-                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Request Body ({selectedEntry.request.postData.mimeType})</h4>
-                                        <div className="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-emerald-400 whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Request Body ({selectedEntry.request.postData.mimeType})</h4>
+                                            <button 
+                                                onClick={() => setPrettyPrintContent({ title: 'Request Body', body: selectedEntry.request.postData?.text || '' })}
+                                                className="px-2 py-0.5 bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-700 rounded text-[9px] font-bold transition-colors"
+                                            >
+                                                View Pretty
+                                            </button>
+                                        </div>
+                                        <div className="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-emerald-400 whitespace-pre-wrap break-all max-h-48 overflow-y-auto border border-slate-800">
                                             {selectedEntry.request.postData.text}
                                         </div>
                                     </section>
@@ -395,8 +516,16 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                                 {/* Response Content */}
                                 {selectedEntry.response.content.text && (
                                     <section>
-                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Response Body</h4>
-                                        <div className="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-sky-400 whitespace-pre-wrap break-all max-h-64 overflow-y-auto">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Response Body</h4>
+                                            <button 
+                                                onClick={() => setPrettyPrintContent({ title: 'Response Body', body: selectedEntry.response.content.text || '' })}
+                                                className="px-2 py-0.5 bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-700 rounded text-[9px] font-bold transition-colors"
+                                            >
+                                                View Pretty
+                                            </button>
+                                        </div>
+                                        <div className="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-sky-400 whitespace-pre-wrap break-all max-h-64 overflow-y-auto border border-slate-800">
                                             {selectedEntry.response.content.text}
                                         </div>
                                     </section>
@@ -435,6 +564,61 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
           </p>
         </div>
       </div>
+
+      {/* Pretty Print Modal */}
+      {prettyPrintContent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+              <div className="bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/20 w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
+                            <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">{prettyPrintContent.title}</h3>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <button 
+                                onClick={() => handleCopy(prettyPrintContent.body, 'modal')}
+                                className="flex items-center space-x-2 px-3 py-1.5 text-[11px] font-bold text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-full transition-all border border-slate-100 hover:border-sky-200"
+                            >
+                                {copied === 'modal' ? <CheckIcon className="h-3.5 w-3.5 text-emerald-500" /> : <ClipboardIcon className="h-3.5 w-3.5" />}
+                                <span>{copied === 'modal' ? 'Copied' : 'Copy All'}</span>
+                            </button>
+                            <div className="w-px h-4 bg-slate-200 mx-1" />
+                            <button 
+                                onClick={() => setPrettyPrintContent(null)}
+                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
+                            >
+                                <XIcon className="h-5 w-5" />
+                            </button>
+                        </div>
+                  </div>
+                  <div className="flex-1 overflow-auto bg-slate-950 selection:bg-sky-500/30">
+                      <div className="p-8">
+                          <pre className="text-[13px] font-mono text-sky-400/90 leading-relaxed whitespace-pre-wrap break-words [tab-size:4]">
+                              {(() => {
+                                  try {
+                                      const parsed = JSON.parse(prettyPrintContent.body);
+                                      return JSON.stringify(parsed, null, 4);
+                                  } catch {
+                                      return prettyPrintContent.body;
+                                  }
+                              })()}
+                          </pre>
+                      </div>
+                  </div>
+                  <div className="px-6 py-3 border-t border-slate-50 bg-slate-50/50 flex justify-between items-center shrink-0">
+                      <p className="text-[10px] text-slate-400 font-medium tracking-tight">
+                          <span className="text-slate-500 font-bold">Pro Tip:</span> Use browser search (Ctrl+F) to filter this content.
+                      </p>
+                      <button 
+                          onClick={() => setPrettyPrintContent(null)}
+                          className="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors"
+                      >
+                          Close Esc
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

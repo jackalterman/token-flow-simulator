@@ -111,13 +111,17 @@ export const analyzeEntry = (entry: HarEntry, averageTime: number = 500): HarAna
 export const parseHarFile = (jsonString: string): HarRoot => {
   try {
     const parsed: HarRoot = JSON.parse(jsonString);
-    if (parsed.log?.entries) {
+    if (parsed.log?.entries && Array.isArray(parsed.log.entries)) {
       const entries = parsed.log.entries;
-      const avgTime = entries.reduce((acc, e) => acc + e.time, 0) / entries.length;
+      const validEntriesWithTime = entries.filter(e => typeof e.time === 'number');
+      const avgTime = validEntriesWithTime.length > 0 
+        ? validEntriesWithTime.reduce((acc, e) => acc + (e.time || 0), 0) / validEntriesWithTime.length 
+        : 500;
       
       parsed.log.entries = entries.map((entry, index) => ({
         ...entry,
-        _id: `har-${index}-${Date.now()}`,
+        _id: entry._id || `har-${index}-${Date.now()}`,
+        time: entry.time || 0,
         analysis: analyzeEntry(entry, avgTime)
       }));
     }
