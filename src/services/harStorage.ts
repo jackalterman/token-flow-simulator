@@ -1,53 +1,9 @@
 import { HarRoot } from './har';
+import { openDB } from './db';
 
-const DB_NAME = 'SecurityTribeToolkitDB';
 const STORE_NAME = 'har-file';
 const METADATA_KEY = 'har-metadata';
-const DB_VERSION = 4;
 
-export const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = (event) => {
-      console.error('IndexedDB error:', event);
-      reject('Error opening database');
-    };
-
-    request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      
-      // Create har-file store if it doesn't exist
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-      
-      // Create token-diff store if it doesn't exist (for compatibility)
-      if (!db.objectStoreNames.contains('token-diff')) {
-        db.createObjectStore('token-diff');
-      }
-
-      // Create token-tester store if it doesn't exist
-      if (!db.objectStoreNames.contains('token-tester')) {
-        db.createObjectStore('token-tester');
-      }
-      
-      // Create jwt-encoder store if it doesn't exist
-      if (!db.objectStoreNames.contains('jwt-encoder')) {
-        db.createObjectStore('jwt-encoder');
-      }
-      
-      // Create jwt-decoder store if it doesn't exist
-      if (!db.objectStoreNames.contains('jwt-decoder')) {
-        db.createObjectStore('jwt-decoder');
-      }
-    };
-  });
-};
 
 export interface HarMetadata {
   id: string;

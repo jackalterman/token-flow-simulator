@@ -1,6 +1,6 @@
-const DB_NAME = 'SecurityTribeToolkitDB';
+import { openDB } from './db';
+
 const STORE_NAME = 'token-tester';
-const DB_VERSION = 4;
 
 export interface TokenTesterState {
   url: string;
@@ -14,40 +14,6 @@ export interface TokenTesterState {
   formData: { key: string; value: string }[];
 }
 
-export const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = (event) => {
-      console.error('IndexedDB error:', event);
-      reject('Error opening database');
-    };
-
-    request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      
-      if (!db.objectStoreNames.contains('har-file')) {
-        db.createObjectStore('har-file');
-      }
-      if (!db.objectStoreNames.contains('token-diff')) {
-        db.createObjectStore('token-diff');
-      }
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-      if (!db.objectStoreNames.contains('jwt-encoder')) {
-        db.createObjectStore('jwt-encoder');
-      }
-      if (!db.objectStoreNames.contains('jwt-decoder')) {
-        db.createObjectStore('jwt-decoder');
-      }
-    };
-  });
-};
 
 export const saveTokenTesterState = async (state: TokenTesterState): Promise<void> => {
   const db = await openDB();

@@ -1,55 +1,12 @@
-const DB_NAME = 'SecurityTribeToolkitDB';
+import { openDB } from './db';
+
 const STORE_NAME = 'token-diff';
-const DB_VERSION = 4;
 
 export interface TokenDiffState {
   tokenA: string;
   tokenB: string;
 }
 
-export const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = (event) => {
-      console.error('IndexedDB error:', event);
-      reject('Error opening database');
-    };
-
-    request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      
-      // Create token-diff store if it doesn't exist
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-      
-      // Also ensure har-file store exists (for backward compatibility)
-      if (!db.objectStoreNames.contains('har-file')) {
-        db.createObjectStore('har-file');
-      }
-
-      // Create token-tester store if it doesn't exist
-      if (!db.objectStoreNames.contains('token-tester')) {
-        db.createObjectStore('token-tester');
-      }
-      
-      // Create jwt-encoder store if it doesn't exist
-      if (!db.objectStoreNames.contains('jwt-encoder')) {
-        db.createObjectStore('jwt-encoder');
-      }
-      
-      // Create jwt-decoder store if it doesn't exist
-      if (!db.objectStoreNames.contains('jwt-decoder')) {
-        db.createObjectStore('jwt-decoder');
-      }
-    };
-  });
-};
 
 export const saveTokenDiffToDB = async (data: TokenDiffState): Promise<void> => {
   const db = await openDB();
