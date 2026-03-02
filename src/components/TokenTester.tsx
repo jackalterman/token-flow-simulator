@@ -21,18 +21,20 @@ import { storageService } from '../services/storageService';
 const TokenTester: React.FC = () => {
   const [url, setUrl] = useState('https://httpbin.org/post');
   const [method, setMethod] = useState('POST');
-  const [headers, setHeaders] = useState<{ key: string; value: string }[]>([
-    { key: 'Content-Type', value: 'application/json' }
+  const [headers, setHeaders] = useState<{ key: string; value: string; enabled: boolean }[]>([
+    { key: 'Content-Type', value: 'application/json', enabled: true },
+    { key: 'Accept', value: 'application/json', enabled: true },
+    { key: 'User-Agent', value: 'Security Tribe Toolkit', enabled: true }
   ]);
   const [authType, setAuthType] = useState<'none' | 'basic' | 'bearer'>('none');
   const [basicAuth, setBasicAuth] = useState({ user: '', pass: '' });
   const [bearerToken, setBearerToken] = useState('');
   const [bodyType, setBodyType] = useState<'json' | 'form'>('json');
   const [body, setBody] = useState('{\n  "message": "Hello from Security Tribe!"\n}');
-  const [formData, setFormData] = useState<{ key: string; value: string }[]>([
-    { key: 'grant_type', value: 'authorization_code' },
-    { key: 'code', value: '' },
-    { key: 'client_id', value: '' }
+  const [formData, setFormData] = useState<{ key: string; value: string; enabled: boolean }[]>([
+    { key: 'grant_type', value: 'authorization_code', enabled: true },
+    { key: 'code', value: '', enabled: true },
+    { key: 'client_id', value: '', enabled: true }
   ]);
   
   const [response, setResponse] = useState<{
@@ -118,21 +120,21 @@ const TokenTester: React.FC = () => {
   }, [isLoaded, url, method, headers, authType, basicAuth, bearerToken, bodyType, body, formData]);
 
   const handleAddHeader = () => {
-    setHeaders([...headers, { key: '', value: '' }]);
+    setHeaders([...headers, { key: '', value: '', enabled: true }]);
   };
 
   const handleRemoveHeader = (index: number) => {
     setHeaders(headers.filter((_, i) => i !== index));
   };
 
-  const handleHeaderChange = (index: number, field: 'key' | 'value', value: string) => {
+  const handleHeaderChange = (index: number, field: 'key' | 'value' | 'enabled', value: any) => {
     const newHeaders = [...headers];
-    newHeaders[index][field] = value;
+    (newHeaders[index] as any)[field] = value;
     setHeaders(newHeaders);
   };
   
   const handleAddFormData = () => {
-    setFormData([...formData, { key: '', value: '' }]);
+    setFormData([...formData, { key: '', value: '', enabled: true }]);
   };
 
   const handleRemoveFormData = (index: number) => {
@@ -140,21 +142,21 @@ const TokenTester: React.FC = () => {
     setFormData(newFormData);
     if (bodyType === 'form') {
       const bodyStr = newFormData
-        .filter(item => item.key.trim())
+        .filter(item => item.enabled && item.key.trim())
         .map(item => `${encodeURIComponent(item.key)}=${encodeURIComponent(item.value)}`)
         .join('&');
       setBody(bodyStr);
     }
   };
 
-  const handleFormDataChange = (index: number, field: 'key' | 'value', value: string) => {
+  const handleFormDataChange = (index: number, field: 'key' | 'value' | 'enabled', value: any) => {
     const newFormData = [...formData];
-    newFormData[index][field] = value;
+    (newFormData[index] as any)[field] = value;
     setFormData(newFormData);
     
     if (bodyType === 'form') {
       const bodyStr = newFormData
-        .filter(item => item.key.trim())
+        .filter(item => item.enabled && item.key.trim())
         .map(item => `${encodeURIComponent(item.key)}=${encodeURIComponent(item.value)}`)
         .join('&');
       setBody(bodyStr);
@@ -176,7 +178,7 @@ const TokenTester: React.FC = () => {
     try {
       const requestHeaders: Record<string, string> = {};
       headers.forEach(h => {
-        if (h.key.trim()) requestHeaders[h.key] = h.value;
+        if (h.enabled && h.key.trim()) requestHeaders[h.key] = h.value;
       });
 
       if (authType === 'basic' && basicAuth.user) {
@@ -254,7 +256,7 @@ const TokenTester: React.FC = () => {
   const getFormedRequest = () => {
     const requestHeaders: Record<string, string> = {};
     headers.forEach(h => {
-        if (h.key.trim()) requestHeaders[h.key] = h.value;
+        if (h.enabled && h.key.trim()) requestHeaders[h.key] = h.value;
     });
 
     if (authType === 'basic' && basicAuth.user) {
@@ -470,20 +472,27 @@ const TokenTester: React.FC = () => {
                 </div>
                 <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                   {headers.map((header, index) => (
-                    <div key={index} className="flex space-x-2 animate-fade-in group">
+                    <div key={index} className="flex items-center space-x-2 animate-fade-in group">
+                      <input 
+                        type="checkbox"
+                        checked={header.enabled}
+                        onChange={(e) => handleHeaderChange(index, 'enabled', e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        title="Enable/Disable Header"
+                      />
                       <input 
                         type="text"
                         value={header.key}
                         onChange={(e) => handleHeaderChange(index, 'key', e.target.value)}
                         placeholder="Header Name"
-                        className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                        className={`flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none ${!header.enabled && 'opacity-50'}`}
                       />
                       <input 
                         type="text"
                         value={header.value}
                         onChange={(e) => handleHeaderChange(index, 'value', e.target.value)}
                         placeholder="Value"
-                        className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                        className={`flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none ${!header.enabled && 'opacity-50'}`}
                       />
                       <button 
                         onClick={() => handleRemoveHeader(index)}
@@ -509,7 +518,7 @@ const TokenTester: React.FC = () => {
                             try {
                                 const obj: any = {};
                                 formData.forEach(f => {
-                                    if (f.key.trim()) obj[f.key] = f.value;
+                                    if (f.enabled && f.key.trim()) obj[f.key] = f.value;
                                 });
                                 setBody(JSON.stringify(obj, null, 2));
                             } catch (e) {
@@ -534,7 +543,8 @@ const TokenTester: React.FC = () => {
                                  const obj = JSON.parse(body);
                                  const newFormData = Object.entries(obj).map(([key, value]) => ({ 
                                      key, 
-                                     value: typeof value === 'object' ? JSON.stringify(value) : String(value) 
+                                     value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+                                     enabled: true
                                  }));
                                  if (newFormData.length > 0) setFormData(newFormData);
                                  
@@ -547,9 +557,9 @@ const TokenTester: React.FC = () => {
                                  // If body is already url-encoded, try to parse it
                                  if (body.includes('=') || body.includes('&')) {
                                      const params = new URLSearchParams(body);
-                                     const newFormData: {key: string, value: string}[] = [];
+                                     const newFormData: {key: string, value: string, enabled: boolean}[] = [];
                                      params.forEach((value, key) => {
-                                         newFormData.push({ key, value });
+                                         newFormData.push({ key, value, enabled: true });
                                      });
                                      if (newFormData.length > 0) setFormData(newFormData);
                                  }
@@ -579,20 +589,27 @@ const TokenTester: React.FC = () => {
                   ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                         {formData.map((item, index) => (
-                          <div key={index} className="flex space-x-2 animate-fade-in group">
+                          <div key={index} className="flex items-center space-x-2 animate-fade-in group">
+                            <input 
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={(e) => handleFormDataChange(index, 'enabled', e.target.checked)}
+                              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                              title="Enable/Disable Parameter"
+                            />
                             <input 
                               type="text"
                               value={item.key}
                               onChange={(e) => handleFormDataChange(index, 'key', e.target.value)}
                               placeholder="Key"
-                              className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                              className={`flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none ${!item.enabled && 'opacity-50'}`}
                             />
                             <input 
                               type="text"
                               value={item.value}
                               onChange={(e) => handleFormDataChange(index, 'value', e.target.value)}
                               placeholder="Value"
-                              className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                              className={`flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none ${!item.enabled && 'opacity-50'}`}
                             />
                             <button 
                               onClick={() => handleRemoveFormData(index)}
@@ -734,7 +751,7 @@ const TokenTester: React.FC = () => {
                                 <ClipboardIcon className="h-4 w-4" />
                             </button>
                         </div>
-                        <pre className="w-full h-[calc(100%-2rem)] bg-slate-800 text-sky-400 p-6 rounded-xl font-mono text-xs overflow-auto custom-scrollbar border border-slate-700 shadow-inner leading-relaxed">
+                        <pre className="w-full h-full bg-slate-800 text-sky-400 p-6 rounded-xl font-mono text-xs overflow-auto custom-scrollbar border border-slate-700 shadow-inner leading-relaxed whitespace-pre-wrap break-all">
                             {response.body}
                         </pre>
                     </div>

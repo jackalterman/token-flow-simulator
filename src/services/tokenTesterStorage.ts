@@ -5,13 +5,13 @@ const STORE_NAME = 'token-tester';
 export interface TokenTesterState {
   url: string;
   method: string;
-  headers: { key: string; value: string }[];
+  headers: { key: string; value: string; enabled?: boolean }[];
   authType: 'none' | 'basic' | 'bearer';
   basicAuth?: { user: string; pass: string };
   bearerToken?: string;
   bodyType: 'json' | 'form';
   body: string;
-  formData: { key: string; value: string }[];
+  formData: { key: string; value: string; enabled?: boolean }[];
 }
 
 
