@@ -13,10 +13,17 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   InfoIcon,
-  XIcon
+  XIcon,
+  UploadIcon,
+  DownloadIcon,
+  DatabaseIcon,
+  EyeIcon,
+  CertificateIcon
 } from './icons';
 import { getTokenTesterState, saveTokenTesterState, TokenTesterState } from '../services/tokenTesterStorage';
 import { storageService } from '../services/storageService';
+import { replaceVariables } from '../services/variableService';
+import { toCurl, fromCurl } from '../services/curlParser';
 
 const TokenTester: React.FC = () => {
   const [url, setUrl] = useState('https://httpbin.org/post');
@@ -49,9 +56,14 @@ const TokenTester: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'request' | 'response'>('request');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [showKeyPicker, setShowKeyPicker] = useState(false);
+  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [secrets, setSecrets] = useState<any[]>([]);
+  const [variables, setVariables] = useState<{ key: string; value: string; enabled: boolean }[]>([]);
+  const [showVariableManager, setShowVariableManager] = useState(false);
+  const [showCurlImport, setShowCurlImport] = useState(false);
+  const [showAuthDropdown, setShowAuthDropdown] = useState(false);
+  const [curlCommand, setCurlCommand] = useState('');
 
   // Auto-hide toast
   useEffect(() => {
@@ -61,20 +73,20 @@ const TokenTester: React.FC = () => {
     }
   }, [toast]);
 
-  // Load secrets for key picker
+  // Load secrets for collection picker
   useEffect(() => {
-    if (showKeyPicker) {
-      const loadSecrets = async () => {
+    if (showCollectionPicker) {
+      const loadCollection = async () => {
         try {
           const allItems = await storageService.getItems();
-          setSecrets(allItems.filter(i => i.type === 'secret' || i.type === 'key' || i.type === 'certificate'));
+          setSecrets(allItems); // Allow all items per user request
         } catch (err) {
-          console.error('Failed to load secrets', err);
+          console.error('Failed to load collections', err);
         }
       };
-      loadSecrets();
+      loadCollection();
     }
-  }, [showKeyPicker]);
+  }, [showCollectionPicker]);
 
   // Load state from IndexedDB
   useEffect(() => {
@@ -91,6 +103,7 @@ const TokenTester: React.FC = () => {
           setBodyType(savedState.bodyType);
           setBody(savedState.body);
           if (savedState.formData) setFormData(savedState.formData);
+          if (savedState.variables) setVariables(savedState.variables);
         }
       } catch (err) {
         console.error('Failed to load token tester state', err);
@@ -114,10 +127,11 @@ const TokenTester: React.FC = () => {
       bearerToken,
       bodyType,
       body,
-      formData
+      formData,
+      variables
     };
     saveTokenTesterState(state).catch(err => console.error('Failed to save state', err));
-  }, [isLoaded, url, method, headers, authType, basicAuth, bearerToken, bodyType, body, formData]);
+  }, [isLoaded, url, method, headers, authType, basicAuth, bearerToken, bodyType, body, formData, variables]); 
 
   const handleAddHeader = () => {
     setHeaders([...headers, { key: '', value: '', enabled: true }]);
@@ -176,15 +190,37 @@ const TokenTester: React.FC = () => {
     const startTime = Date.now();
     
     try {
+      // Apply variable replacement to all request components
+      const finalUrl = replaceVariables(url, variables);
+      const finalBearerToken = replaceVariables(bearerToken, variables);
+      const finalBasicUser = replaceVariables(basicAuth.user, variables);
+      const finalBasicPass = replaceVariables(basicAuth.pass, variables);
+
+      let finalBody = '';
+      if (bodyType === 'form') {
+        finalBody = formData
+          .filter(item => item.enabled && item.key.trim())
+          .map(item => {
+              const k = replaceVariables(item.key, variables);
+              const v = replaceVariables(item.value, variables);
+              return `${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+          })
+          .join('&');
+      } else {
+        finalBody = replaceVariables(body, variables);
+      }
+
       const requestHeaders: Record<string, string> = {};
       headers.forEach(h => {
-        if (h.enabled && h.key.trim()) requestHeaders[h.key] = h.value;
+        if (h.enabled && h.key.trim()) {
+            requestHeaders[replaceVariables(h.key, variables)] = replaceVariables(h.value, variables);
+        }
       });
 
-      if (authType === 'basic' && basicAuth.user) {
-        requestHeaders['Authorization'] = `Basic ${btoa(`${basicAuth.user}:${basicAuth.pass}`)}`;
-      } else if (authType === 'bearer' && bearerToken) {
-        requestHeaders['Authorization'] = `Bearer ${bearerToken}`;
+      if (authType === 'basic' && finalBasicUser) {
+        requestHeaders['Authorization'] = `Basic ${btoa(`${finalBasicUser}:${finalBasicPass}`)}`;
+      } else if (authType === 'bearer' && finalBearerToken) {
+        requestHeaders['Authorization'] = `Bearer ${finalBearerToken}`;
       }
 
       // Add Content-Type if missing for POST/PUT
@@ -198,10 +234,10 @@ const TokenTester: React.FC = () => {
       };
 
       if (method !== 'GET' && method !== 'HEAD') {
-        options.body = body;
+        options.body = finalBody;
       }
 
-      const res = await fetch(url, options);
+      const res = await fetch(finalUrl, options);
       const endTime = Date.now();
       
       const responseHeaders: Record<string, string> = {};
@@ -242,6 +278,89 @@ const TokenTester: React.FC = () => {
     }
   };
 
+  const handleCurlImport = () => {
+    const config = fromCurl(curlCommand);
+    if (config) {
+      if (config.url) setUrl(config.url);
+      if (config.method) setMethod(config.method);
+      if (config.headers) {
+          const newHeaders = config.headers.map(h => ({ ...h, enabled: true }));
+          // Merge with default/existing if they don't overlap? For now just overwrite to be safe like a real import
+          setHeaders(newHeaders);
+      }
+      if (config.body) setBody(config.body);
+      if (config.authType) setAuthType(config.authType);
+      if (config.bearerToken) setBearerToken(config.bearerToken);
+      if (config.basicAuth) setBasicAuth(config.basicAuth);
+      
+      setShowCurlImport(false);
+      setCurlCommand('');
+      showNotification('Request imported from CURL', 'success');
+    } else {
+      showNotification('Invalid CURL command', 'error');
+    }
+  };
+
+  const handleCopyAsCurl = () => {
+    let finalBody = body;
+    if (bodyType === 'form') {
+      finalBody = formData
+        .filter(item => item.enabled && item.key.trim())
+        .map(item => {
+            const k = replaceVariables(item.key, variables);
+            const v = replaceVariables(item.value, variables);
+            return `${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+        })
+        .join('&');
+    } else {
+      finalBody = replaceVariables(body, variables);
+    }
+
+    const curl = toCurl({
+      url: replaceVariables(url, variables),
+      method,
+      headers: headers.map(h => ({
+          ...h,
+          key: replaceVariables(h.key, variables),
+          value: replaceVariables(h.value, variables),
+          enabled: h.enabled || false
+      })),
+      body: finalBody,
+      authType,
+      basicAuth: {
+          user: replaceVariables(basicAuth.user, variables),
+          pass: replaceVariables(basicAuth.pass, variables)
+      },
+      bearerToken: replaceVariables(bearerToken, variables)
+    });
+    navigator.clipboard.writeText(curl);
+    showNotification('CURL command copied to clipboard (variables resolved)', 'success');
+  };
+
+  const handleAddVariable = () => {
+    setVariables([...variables, { key: '', value: '', enabled: true }]);
+  };
+
+  const handleVariableChange = (index: number, field: 'key' | 'value' | 'enabled', value: any) => {
+    const newVars = [...variables];
+    (newVars[index] as any)[field] = value;
+    setVariables(newVars);
+  };
+
+  const findJwtInString = (str: string): string | null => {
+    // Basic JWT regex: header.payload.signature
+    const jwtRegex = /eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g;
+    const matches = str.match(jwtRegex);
+    return matches ? matches[0] : null;
+  };
+
+  const handleInspectJwt = (token: string) => {
+    localStorage.setItem('SecurityTribeToolkit_encoded_jwt', token);
+    const event = new CustomEvent('app-change-view', { detail: 'Decode' });
+    window.dispatchEvent(event);
+    showNotification('Token sent to Decoder', 'success');
+  };
+
   const loadFromEncoder = () => {
     const encodedJwt = localStorage.getItem('SecurityTribeToolkit_encoded_jwt');
     if (encodedJwt) {
@@ -254,59 +373,66 @@ const TokenTester: React.FC = () => {
   };
 
   const getFormedRequest = () => {
+    const finalUrl = replaceVariables(url, variables);
     const requestHeaders: Record<string, string> = {};
+    
     headers.forEach(h => {
-        if (h.enabled && h.key.trim()) requestHeaders[h.key] = h.value;
+        if (h.enabled && h.key.trim()) {
+            requestHeaders[replaceVariables(h.key, variables)] = replaceVariables(h.value, variables);
+        }
     });
 
     if (authType === 'basic' && basicAuth.user) {
-        requestHeaders['Authorization'] = `Basic ${btoa(`${basicAuth.user}:${basicAuth.pass}`)}`;
+        const u = replaceVariables(basicAuth.user, variables);
+        const p = replaceVariables(basicAuth.pass, variables);
+        requestHeaders['Authorization'] = `Basic ${btoa(`${u}:${p}`)}`;
     } else if (authType === 'bearer' && bearerToken) {
-        requestHeaders['Authorization'] = `Bearer ${bearerToken}`;
+        requestHeaders['Authorization'] = `Bearer ${replaceVariables(bearerToken, variables)}`;
     }
 
     if ((method === 'POST' || method === 'PUT') && !requestHeaders['Content-Type']) {
         requestHeaders['Content-Type'] = bodyType === 'json' ? 'application/json' : 'application/x-www-form-urlencoded';
     }
 
-    return `${method} ${url} HTTP/1.1\n` +
+    let finalBody = '';
+    if (bodyType === 'form') {
+        finalBody = formData
+          .filter(item => item.enabled && item.key.trim())
+          .map(item => {
+              const k = replaceVariables(item.key, variables);
+              const v = replaceVariables(item.value, variables);
+              return `${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+          })
+          .join('&');
+    } else {
+        finalBody = replaceVariables(body, variables);
+    }
+
+    return `${method} ${finalUrl} HTTP/1.1\n` +
            Object.entries(requestHeaders).map(([k, v]) => `${k}: ${v}`).join('\n') +
-           (method !== 'GET' && method !== 'HEAD' ? `\n\n${body}` : '');
+           (method !== 'GET' && method !== 'HEAD' ? `\n\n${finalBody}` : '');
   };
 
 
   return (
     <div className="space-y-6 relative">
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-8 right-8 z-[100] animate-fade-in flex items-center p-4 rounded-lg shadow-lg border transition-all ${
-          toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 
-          toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 
-          'bg-blue-50 border-blue-200 text-blue-800'
-        }`}>
-          {toast.type === 'success' ? <CheckCircleIcon className="h-5 w-5 mr-3" /> : 
-           toast.type === 'error' ? <XCircleIcon className="h-5 w-5 mr-3" /> : 
-           <InfoIcon className="h-5 w-5 mr-3" />}
-          <span className="font-medium text-sm">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-4 hover:opacity-50 transition-opacity">
-            <XIcon className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
-      {/* Key Picker Modal Header-like overlay */}
-      {showKeyPicker && (
+      {/* Collection Picker Modal */}
+      {showCollectionPicker && (
           <div className="fixed inset-0 z-[90] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
                   <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                      <h3 className="font-bold text-slate-800">Select Secret/Key</h3>
-                      <button onClick={() => setShowKeyPicker(false)} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
+                      <div className="flex items-center space-x-2">
+                        <DatabaseIcon className="h-5 w-5 text-sky-600" />
+                        <h3 className="font-bold text-slate-800">Load from Collection</h3>
+                      </div>
+                      <button onClick={() => setShowCollectionPicker(false)} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
                           <XIcon className="h-5 w-5 text-slate-500" />
                       </button>
                   </div>
-                  <div className="max-h-[300px] overflow-y-auto p-2">
+                  <div className="max-h-[400px] overflow-y-auto p-2 custom-scrollbar pr-1">
                       {secrets.length === 0 ? (
-                          <div className="p-8 text-center text-slate-400 italic">No secrets found in collections.</div>
+                          <div className="p-8 text-center text-slate-400 italic">No items found in collections.</div>
                       ) : (
                           secrets.map(s => (
                               <button 
@@ -314,17 +440,23 @@ const TokenTester: React.FC = () => {
                                 onClick={() => {
                                     setBearerToken(s.content);
                                     setAuthType('bearer');
-                                    setShowKeyPicker(false);
+                                    setShowCollectionPicker(false);
                                     showNotification(`Loaded: ${s.title}`, 'success');
                                 }}
-                                className="w-full text-left p-3 hover:bg-sky-50 rounded-xl transition-colors flex items-center group"
+                                className="w-full text-left p-3 hover:bg-sky-50 rounded-xl transition-colors flex items-center group mb-1 border border-transparent hover:border-sky-100"
                               >
                                   <div className="bg-sky-100 p-2 rounded-lg mr-3 group-hover:bg-sky-200 transition-colors">
-                                      <KeyIcon className="h-4 w-4 text-sky-600" />
+                                      {s.type === 'key' ? <KeyIcon className="h-4 w-4 text-sky-600" /> :
+                                       s.type === 'jwt' ? <FileCodeIcon className="h-4 w-4 text-sky-600" /> :
+                                       s.type === 'certificate' ? <CertificateIcon className="h-4 w-4 text-sky-600" /> :
+                                       <DatabaseIcon className="h-4 w-4 text-sky-600" />}
                                   </div>
-                                  <div>
-                                      <div className="font-semibold text-sm text-slate-700">{s.title}</div>
-                                      <div className="text-[10px] text-slate-400 font-mono truncate max-w-[200px]">{s.content}</div>
+                                  <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <div className="font-semibold text-sm text-slate-700 truncate">{s.title}</div>
+                                        <span className="text-[9px] font-bold text-sky-500 uppercase px-1.5 py-0.5 bg-sky-50 rounded border border-sky-100">{s.type}</span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-mono truncate">{s.content}</div>
                                   </div>
                               </button>
                           ))
@@ -347,21 +479,134 @@ const TokenTester: React.FC = () => {
         
         <div className="flex space-x-2">
             <button
-                onClick={loadFromEncoder}
+                onClick={() => setShowVariableManager(true)}
                 className="flex items-center px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm active:translate-y-px"
+                title="Manage {{variables}}"
             >
-                <FileCodeIcon className="h-4 w-4 mr-2 text-sky-500" />
-                Load from Encoder
+                <DatabaseIcon className="h-4 w-4 mr-2 text-sky-500" />
+                Variables
             </button>
             <button
-                onClick={() => setShowKeyPicker(true)}
+                onClick={() => setShowCurlImport(true)}
                 className="flex items-center px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm active:translate-y-px"
+                title="Import from CURL"
             >
-                <KeyIcon className="h-4 w-4 mr-2 text-sky-500" />
-                Load Key/Secret
+                <UploadIcon className="h-4 w-4 mr-2 text-sky-500" />
+                Import
             </button>
         </div>
       </div>
+
+      {/* Variable Manager Modal */}
+      {showVariableManager && (
+          <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-fade-in">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <DatabaseIcon className="h-5 w-5 text-sky-600" />
+                        <h3 className="font-bold text-slate-800">Manage Variables</h3>
+                      </div>
+                      <button onClick={() => setShowVariableManager(false)} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
+                          <XIcon className="h-5 w-5 text-slate-500" />
+                      </button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <p className="text-xs text-slate-500 italic">Define variables here and use them in the URL, Headers, or Body as <code className="bg-slate-100 px-1 rounded text-sky-600">{"{{KEY}}"}</code>.</p>
+                      
+                      <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                          {variables.length === 0 ? (
+                              <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">No variables defined.</div>
+                          ) : (
+                              variables.map((v, index) => (
+                                  <div key={index} className="flex items-center space-x-2 animate-fade-in">
+                                      <input 
+                                          type="checkbox"
+                                          checked={v.enabled}
+                                          onChange={(e) => handleVariableChange(index, 'enabled', e.target.checked)}
+                                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                      />
+                                      <input 
+                                          type="text"
+                                          value={v.key}
+                                          onChange={(e) => handleVariableChange(index, 'key', e.target.value)}
+                                          placeholder="VARIABLE_NAME"
+                                          className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-mono focus:ring-1 focus:ring-sky-500 outline-none"
+                                      />
+                                      <input 
+                                          type="text"
+                                          value={v.value}
+                                          onChange={(e) => handleVariableChange(index, 'value', e.target.value)}
+                                          placeholder="value"
+                                          className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-sky-500 outline-none"
+                                      />
+                                      <button 
+                                          onClick={() => setVariables(variables.filter((_, i) => i !== index))}
+                                          className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                      >
+                                          <TrashIcon className="h-4 w-4" />
+                                      </button>
+                                  </div>
+                              ))
+                          )}
+                      </div>
+                      <button 
+                          onClick={handleAddVariable}
+                          className="w-full py-2 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-sky-300 hover:text-sky-500 transition-all flex items-center justify-center text-sm font-medium"
+                      >
+                          <PlusIcon className="h-4 w-4 mr-2" /> Add Variable
+                      </button>
+                  </div>
+                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                      <button 
+                        onClick={() => setShowVariableManager(false)}
+                        className="px-6 py-2 bg-sky-600 text-white rounded-lg font-bold text-sm hover:bg-sky-700 transition-all shadow-md"
+                      >
+                          Done
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* CURL Import Modal */}
+      {showCurlImport && (
+          <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-fade-in">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <UploadIcon className="h-5 w-5 text-sky-600" />
+                        <h3 className="font-bold text-slate-800">Import from CURL</h3>
+                      </div>
+                      <button onClick={() => setShowCurlImport(false)} className="p-1 hover:bg-slate-200 rounded-lg transition-colors">
+                          <XIcon className="h-5 w-5 text-slate-500" />
+                      </button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <textarea 
+                          value={curlCommand}
+                          onChange={(e) => setCurlCommand(e.target.value)}
+                          placeholder="Paste curl command here..."
+                          className="w-full h-48 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-sky-500 outline-none"
+                      />
+                      <p className="text-[10px] text-slate-400 italic">Supports URL, -X (Method), -H (Headers), and -d (Body).</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-3">
+                      <button 
+                        onClick={() => setShowCurlImport(false)}
+                        className="px-4 py-2 text-slate-500 font-medium text-sm hover:text-slate-700"
+                      >
+                          Cancel
+                      </button>
+                      <button 
+                        onClick={handleCurlImport}
+                        className="px-6 py-2 bg-sky-600 text-white rounded-lg font-bold text-sm hover:bg-sky-700 transition-all shadow-md"
+                      >
+                          Import Request
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Left Column: Request Configuration */}
@@ -412,10 +657,13 @@ const TokenTester: React.FC = () => {
               <div className="space-y-3">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Authentication</label>
                 <div className="flex space-x-2">
-                  {(['none', 'basic', 'bearer'] as const).map(type => (
+                  {(['none', 'basic'] as const).map(type => (
                     <button
                       key={type}
-                      onClick={() => setAuthType(type)}
+                      onClick={() => {
+                        setAuthType(type);
+                        setShowAuthDropdown(false);
+                      }}
                       className={`flex-1 py-1.5 text-xs font-medium rounded-md border transition-all ${
                         authType === type 
                         ? 'bg-sky-50 border-sky-200 text-sky-700' 
@@ -425,6 +673,72 @@ const TokenTester: React.FC = () => {
                       {type.toUpperCase()}
                     </button>
                   ))}
+                  <div className="flex-1 relative">
+                    <button
+                      onClick={() => {
+                        setAuthType('bearer');
+                        setShowAuthDropdown(!showAuthDropdown);
+                      }}
+                      className={`w-full flex items-center justify-center space-x-1 py-1.5 text-xs font-medium rounded-md border transition-all ${
+                        authType === 'bearer' 
+                        ? 'bg-sky-50 border-sky-200 text-sky-700' 
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>BEARER</span>
+                      <ChevronDownIcon className={`h-3 w-3 transition-transform ${showAuthDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {showAuthDropdown && (
+                        <>
+                            <div 
+                                className="fixed inset-0 z-40" 
+                                onClick={() => setShowAuthDropdown(false)}
+                            />
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-fade-in py-1 min-w-[160px]">
+                                <button
+                                    onClick={() => {
+                                        loadFromEncoder();
+                                        setShowAuthDropdown(false);
+                                    }}
+                                    className="w-full flex items-center px-3 py-2 text-left text-[11px] text-slate-600 hover:bg-sky-50 transition-colors"
+                                >
+                                    <FileCodeIcon className="h-3.5 w-3.5 mr-2 text-sky-500" />
+                                    Load from Encoder
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowCollectionPicker(true);
+                                        setShowAuthDropdown(false);
+                                    }}
+                                    className="w-full flex items-center px-3 py-2 text-left text-[11px] text-slate-600 hover:bg-sky-50 transition-colors border-t border-slate-50"
+                                >
+                                    <DatabaseIcon className="h-3.5 w-3.5 mr-2 text-sky-500" />
+                                    Load from Collection
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const text = await navigator.clipboard.readText();
+                                            if (text) {
+                                                setBearerToken(text.trim());
+                                                setAuthType('bearer');
+                                                showNotification('Token pasted from clipboard', 'success');
+                                            }
+                                        } catch (err) {
+                                            showNotification('Failed to read clipboard', 'error');
+                                        }
+                                        setShowAuthDropdown(false);
+                                    }}
+                                    className="w-full flex items-center px-3 py-2 text-left text-[11px] text-slate-600 hover:bg-sky-50 transition-colors border-t border-slate-50"
+                                >
+                                    <ClipboardIcon className="h-3.5 w-3.5 mr-2 text-sky-500" />
+                                    Paste from Clipboard
+                                </button>
+                            </div>
+                        </>
+                    )}
+                  </div>
                 </div>
                 
                 {authType === 'basic' && (
@@ -643,17 +957,26 @@ const TokenTester: React.FC = () => {
                     <ChevronDownIcon className="h-4 w-4 text-slate-400 group-open:rotate-180 transition-transform" />
                 </summary>
                 <div className="p-0 bg-slate-800 relative">
-                    <button 
-                        onClick={() => {
-                            navigator.clipboard.writeText(getFormedRequest());
-                            showNotification('Request copied!', 'success');
-                        }}
-                        className="absolute top-4 right-4 p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors z-10"
-                        title="Copy request"
-                    >
-                        <ClipboardIcon className="h-4 w-4" />
-                    </button>
-                    <pre className="text-[10px] font-mono text-sky-400 p-6 overflow-x-auto custom-scrollbar leading-relaxed">
+                    <div className="absolute top-4 right-4 flex space-x-2 z-10">
+                        <button 
+                            onClick={handleCopyAsCurl}
+                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"
+                            title="Copy as CURL"
+                        >
+                            <DownloadIcon className="h-4 w-4" />
+                        </button>
+                        <button 
+                            onClick={() => {
+                                navigator.clipboard.writeText(getFormedRequest());
+                                showNotification('Request copied!', 'success');
+                            }}
+                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"
+                            title="Copy raw request"
+                        >
+                            <ClipboardIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                    <pre className="text-[10px] font-mono text-sky-400 p-6 whitespace-pre-wrap break-all custom-scrollbar leading-relaxed">
                         {getFormedRequest()}
                     </pre>
                 </div>
@@ -741,15 +1064,27 @@ const TokenTester: React.FC = () => {
                     <div className="flex-1 p-6 space-y-4">
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Response Body</label>
-                            <button 
-                                onClick={() => {
-                                    navigator.clipboard.writeText(response.body);
-                                }}
-                                className="p-1.5 hover:bg-slate-100 rounded text-slate-400 transition-colors tooltip"
-                                title="Copy to clipboard"
-                            >
-                                <ClipboardIcon className="h-4 w-4" />
-                            </button>
+                            <div className="flex space-x-2">
+                                {findJwtInString(response.body) && (
+                                    <button 
+                                        onClick={() => handleInspectJwt(findJwtInString(response.body)!)}
+                                        className="flex items-center px-2 py-1 bg-sky-100 text-sky-700 rounded text-[10px] font-bold hover:bg-sky-200 transition-colors animate-pulse"
+                                        title="Decode detected JWT"
+                                    >
+                                        <EyeIcon className="h-3 w-3 mr-1" /> INSPECT TOKEN
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(response.body);
+                                        showNotification('Copied to clipboard', 'success');
+                                    }}
+                                    className="p-1.5 hover:bg-slate-100 rounded text-slate-400 transition-colors"
+                                    title="Copy to clipboard"
+                                >
+                                    <ClipboardIcon className="h-4 w-4" />
+                                </button>
+                            </div>
                         </div>
                         <pre className="w-full h-full bg-slate-800 text-sky-400 p-6 rounded-xl font-mono text-xs overflow-auto custom-scrollbar border border-slate-700 shadow-inner leading-relaxed whitespace-pre-wrap break-all">
                             {response.body}
@@ -807,6 +1142,23 @@ const TokenTester: React.FC = () => {
           animation: fade-in 0.3s ease-out forwards;
         }
       `}} />
+
+      {/* Toast Notification (Moved to bottom to prevent layout shift) */}
+      {toast && (
+        <div className={`fixed top-8 right-8 z-[100] animate-fade-in flex items-center p-4 rounded-lg shadow-lg border transition-all ${
+          toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 
+          toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 
+          'bg-blue-50 border-blue-200 text-blue-800'
+        }`}>
+          {toast.type === 'success' ? <CheckCircleIcon className="h-5 w-5 mr-3" /> : 
+           toast.type === 'error' ? <XCircleIcon className="h-5 w-5 mr-3" /> : 
+           <InfoIcon className="h-5 w-5 mr-3" />}
+          <span className="font-medium text-sm">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-4 hover:opacity-50 transition-opacity">
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

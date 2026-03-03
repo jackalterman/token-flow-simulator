@@ -35,6 +35,14 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = usePersistentState<AppView>('app-active-view', AppView.DECODE);
   const [decoderInitialData, setDecoderInitialData] = useState<DecoderData | null>(null);
 
+  React.useEffect(() => {
+    const handleViewChange = (e: any) => {
+      if (e.detail) setActiveView(e.detail as AppView);
+    };
+    window.addEventListener('app-change-view', handleViewChange);
+    return () => window.removeEventListener('app-change-view', handleViewChange);
+  }, [setActiveView]);
+
   const handleSendToDecoder = (data: DecoderData) => {
     setDecoderInitialData(data);
     setActiveView(AppView.DECODE);

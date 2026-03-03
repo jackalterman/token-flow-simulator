@@ -12,6 +12,7 @@ export interface TokenTesterState {
   bodyType: 'json' | 'form';
   body: string;
   formData: { key: string; value: string; enabled?: boolean }[];
+  variables?: { key: string; value: string; enabled?: boolean }[];
 }
 
 
