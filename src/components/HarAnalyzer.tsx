@@ -19,6 +19,8 @@ import {
 } from './icons';
 import { HarRoot, HarEntry, filterEntries, parseHarFile } from '../services/har';
 import { saveHarToDB, getHarFromDB, clearHarFromDB, getHarMetadataFromDB, deleteHarFromDB, HarMetadata } from '../services/harStorage';
+import { jwtService } from '../services/jwtService';
+import JsonViewer from './JsonViewer';
 
 const PEGA_COOKIES = ['Pega-AAT', 'Pega-Perf', 'Pega-RULES', 'Pega-ThreadName', 'Pega-UI-SessId'];
 
@@ -65,6 +67,13 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [activeTab, setActiveTab] = useState<'headers' | 'payload' | 'response' | 'cookies'>('headers');
   const [prettyPrintContent, setPrettyPrintContent] = useState<{ title: string, body: string } | null>(null);
+  const [expandedCookieIndex, setExpandedCookieIndex] = useState<number | null>(null);
+  const [expandedHeaderIndex, setExpandedHeaderIndex] = useState<number | null>(null);
+  
+  useEffect(() => {
+    setExpandedCookieIndex(null);
+    setExpandedHeaderIndex(null);
+  }, [selectedEntry, activeTab]);
 
   const resourceTypes = ['xhr', 'document', 'script', 'stylesheet', 'image', 'font'];
   const statusRanges = ['2xx', '3xx', '4xx', '5xx'];
@@ -444,18 +453,55 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                                             </div>
                                             <div className="p-2 bg-slate-100/50 font-bold text-slate-500 border-y border-slate-100">Request Headers</div>
                                             <div className="p-2 space-y-1 font-mono">
-                                                {selectedEntry.request.headers.map((h, i) => (
-                                                    <div key={i} className="group flex items-start gap-2">
-                                                        <span className="text-sky-700 font-bold min-w-[140px] shrink-0 border-r border-slate-200 pr-2">{h.name}:</span> 
-                                                        <span className="text-slate-600 break-all flex-1">{h.value}</span>
-                                                        {(h.name.toLowerCase().includes('token') || h.value.startsWith('Bearer ')) && onSendToDecoder && (
-                                                            <button 
-                                                                onClick={() => onSendToDecoder({ token: h.value.replace('Bearer ', ''), key: '' })}
-                                                                className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 bg-sky-100 text-sky-700 rounded-[4px] text-[8px] font-bold"
-                                                            >Decode</button>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                {selectedEntry.request.headers.map((h, i) => {
+                                                    const cleanValue = h.value.replace('Bearer ', '');
+                                                    const decodedJwt = jwtService.decode(cleanValue);
+                                                    const isExpanded = expandedHeaderIndex === i;
+                                                    
+                                                    return (
+                                                        <div key={i} className="border-b border-slate-100/50">
+                                                            <div 
+                                                                className={`p-2 flex items-start gap-2 hover:bg-white/50 transition-colors cursor-pointer group ${isExpanded ? 'bg-white/80' : ''}`}
+                                                                onClick={() => {
+                                                                    if (decodedJwt) setExpandedHeaderIndex(isExpanded ? null : i);
+                                                                }}
+                                                            >
+                                                                <span className="text-sky-700 font-bold min-w-[140px] shrink-0 border-r border-slate-200 pr-2">{h.name}:</span> 
+                                                                <span className="text-slate-600 break-all flex-1">{h.value}</span>
+                                                                {decodedJwt && (
+                                                                    <div className="flex items-center space-x-1">
+                                                                        <span className={`text-[8px] ${isExpanded ? 'bg-sky-600' : 'bg-sky-500'} text-white px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter`}>
+                                                                            JWT
+                                                                        </span>
+                                                                        <ChevronDownIcon className={`h-3 w-3 text-sky-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                                    </div>
+                                                                )}
+                                                                {(h.name.toLowerCase().includes('token') || h.value.startsWith('Bearer ')) && onSendToDecoder && (
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); onSendToDecoder({ token: cleanValue, key: '' }); }}
+                                                                        className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 bg-sky-100 text-sky-700 rounded-[4px] text-[8px] font-bold"
+                                                                    >Full Decoder</button>
+                                                                )}
+                                                            </div>
+                                                            {isExpanded && decodedJwt && (
+                                                                <div className="p-3 bg-white border-x border-slate-200 animate-in slide-in-from-top-2 duration-200">
+                                                                     <div className="bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-800">
+                                                                        <div className="px-3 py-1.5 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                                                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Decoded {h.name}</span>
+                                                                            <button 
+                                                                                onClick={(e) => { e.stopPropagation(); handleCopy(JSON.stringify(decodedJwt.payload, null, 2), `h-dec-${i}`); }}
+                                                                                className="text-[8px] font-bold text-slate-500 hover:text-sky-400"
+                                                                            >Copy JSON</button>
+                                                                        </div>
+                                                                        <div className="p-1">
+                                                                            <JsonViewer data={decodedJwt.payload} />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     </section>
@@ -536,19 +582,59 @@ const HarAnalyzer: React.FC<HarAnalyzerProps> = ({ onSendToDecoder }) => {
                                             {[...selectedEntry.request.cookies, ...selectedEntry.response.cookies].length > 0 ? (
                                                 [...selectedEntry.request.cookies, ...selectedEntry.response.cookies].map((cookie, i) => {
                                                     const isPega = PEGA_COOKIES.some(p => cookie.name.toLowerCase().includes(p.toLowerCase()));
+                                                    const decodedJwt = jwtService.decode(cookie.value);
+                                                    const isExpanded = expandedCookieIndex === i;
+
                                                     return (
-                                                        <div key={i} className={`p-2.5 flex items-start gap-2 hover:bg-white transition-colors cursor-pointer group`} onClick={() => handleCopy(cookie.value, `c-${i}`)}>
-                                                            <div className={`shrink-0 w-1.5 h-1.5 rounded-full mt-1.5 ${isPega ? 'bg-indigo-500 animate-pulse outline outline-4 outline-indigo-50' : 'bg-slate-300'}`} />
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 mb-0.5">
-                                                                    <span className={`font-bold text-[11px] ${isPega ? 'text-indigo-700' : 'text-slate-700'}`}>{cookie.name}</span>
-                                                                    {isPega && <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter">Pega</span>}
-                                                                    {copied === `c-${i}` && <span className="text-[8px] text-emerald-600 font-bold ml-auto flex items-center bg-emerald-50 px-1 rounded"><CheckIcon className="h-2 w-2 mr-0.5" /> Copied</span>}
+                                                        <div key={i} className="border-b border-white">
+                                                            <div 
+                                                                className={`p-2.5 flex items-start gap-2 hover:bg-white transition-colors cursor-pointer group ${isExpanded ? 'bg-white' : ''}`} 
+                                                                onClick={() => {
+                                                                    if (decodedJwt) setExpandedCookieIndex(isExpanded ? null : i);
+                                                                    else handleCopy(cookie.value, `c-${i}`);
+                                                                }}
+                                                            >
+                                                                <div className={`shrink-0 w-1.5 h-1.5 rounded-full mt-1.5 ${isPega ? 'bg-indigo-500 animate-pulse outline outline-4 outline-indigo-50' : 'bg-slate-300'}`} />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2 mb-0.5">
+                                                                        <span className={`font-bold text-[11px] ${isPega ? 'text-indigo-700' : 'text-slate-700'}`}>{cookie.name}</span>
+                                                                        {isPega && <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter">Pega</span>}
+                                                                        {decodedJwt && (
+                                                                            <span className={`text-[8px] ${isExpanded ? 'bg-sky-600 text-white' : 'bg-sky-100 text-sky-700'} px-1.5 py-0.5 rounded uppercase font-extrabold tracking-tighter flex items-center`}>
+                                                                                <DetailIcon className="h-2 w-2 mr-1" />
+                                                                                {isExpanded ? 'Hide Decoded' : 'Click to Decode'}
+                                                                            </span>
+                                                                        )}
+                                                                        {copied === `c-${i}` && <span className="text-[8px] text-emerald-600 font-bold ml-auto flex items-center bg-emerald-50 px-1 rounded"><CheckIcon className="h-2 w-2 mr-0.5" /> Copied</span>}
+                                                                    </div>
+                                                                    <div className={`text-[10px] font-mono text-slate-500 break-all ${isExpanded ? '' : 'line-clamp-2 group-hover:line-clamp-none'} transition-all`}>
+                                                                        {cookie.value}
+                                                                    </div>
                                                                 </div>
-                                                                <div className="text-[10px] font-mono text-slate-500 break-all line-clamp-2 group-hover:line-clamp-none transition-all">
-                                                                    {cookie.value}
-                                                                </div>
+                                                                {decodedJwt && (
+                                                                    <div className={`mt-1.5 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                                                                        <ChevronDownIcon className="h-3.5 w-3.5 text-sky-500" />
+                                                                    </div>
+                                                                )}
                                                             </div>
+                                                            {isExpanded && decodedJwt && (
+                                                                <div className="px-4 pb-4 bg-white animate-in slide-in-from-top-2 duration-200">
+                                                                    <div className="bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-800">
+                                                                        <div className="px-3 py-1.5 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                                                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Decoded {cookie.name}</span>
+                                                                            <div className="flex space-x-2">
+                                                                                <button 
+                                                                                    onClick={(e) => { e.stopPropagation(); handleCopy(JSON.stringify(decodedJwt.payload, null, 2), `c-dec-${i}`); }}
+                                                                                    className="text-[8px] font-bold text-slate-500 hover:text-sky-400 transition-colors"
+                                                                                >Copy JSON</button>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="p-1">
+                                                                            <JsonViewer data={decodedJwt.payload} />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })
